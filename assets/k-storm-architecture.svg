@@ -1,0 +1,208 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 1200 800" font-family="Arial, Helvetica, 'Segoe UI', sans-serif" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility">
+  <defs>
+    <filter id="shadow" x="-12%" y="-12%" width="124%" height="135%">
+      <feDropShadow dx="0" dy="7" stdDeviation="8" flood-color="#0F172A" flood-opacity="0.13"/>
+    </filter>
+    <radialGradient id="halo" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#DCEBFF" stop-opacity="0.9"/>
+      <stop offset="58%" stop-color="#F0F7FF" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="blueSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F4FAFF"/><stop offset="100%" stop-color="#E6F1FF"/>
+    </linearGradient>
+    <linearGradient id="greenSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#F4FFF8"/><stop offset="100%" stop-color="#E6F7EE"/>
+    </linearGradient>
+    <linearGradient id="purpleSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FCF7FF"/><stop offset="100%" stop-color="#F0E6FF"/>
+    </linearGradient>
+    <linearGradient id="orangeSoft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF9F1"/><stop offset="100%" stop-color="#FFECCB"/>
+    </linearGradient>
+    <linearGradient id="coreGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#E7F2FF"/><stop offset="100%" stop-color="#FFF4DF"/>
+    </linearGradient>
+    <linearGradient id="barBlue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3F7EE8"/><stop offset="100%" stop-color="#16B8C5"/>
+    </linearGradient>
+    <marker id="arrowBlue" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#3F7EE8"/></marker>
+    <marker id="arrowDark" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#1F2937"/></marker>
+    <marker id="arrowGreen" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#239553"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#9656D5"/></marker>
+    <style>
+      .title { font-size: 34px; font-weight: 900; fill: #0F172A; letter-spacing: .3px; }
+      .subtitle { font-size: 14px; font-weight: 800; fill: #5B6678; letter-spacing: 1.2px; }
+      .section { font-size: 22px; font-weight: 900; fill: #111827; }
+      .sectionSub { font-size: 13px; font-weight: 800; fill: #667085; letter-spacing: .7px; }
+      .node { font-size: 18px; font-weight: 900; fill: #111827; }
+      .nodeSub { font-size: 14px; font-weight: 750; fill: #596579; }
+      .body { font-size: 16px; font-weight: 800; fill: #253041; }
+      .bodySmall { font-size: 14.5px; font-weight: 800; fill: #344054; }
+      .tiny { font-size: 12px; font-weight: 750; fill: #687589; }
+      .blueFlow { stroke: #3F7EE8; stroke-width: 2.6; fill: none; marker-end: url(#arrowBlue); }
+      .darkFlow { stroke: #1F2937; stroke-width: 2.5; fill: none; marker-end: url(#arrowDark); }
+      .greenFlow { stroke: #239553; stroke-width: 2.6; fill: none; marker-end: url(#arrowGreen); }
+      .purpleFlow { stroke: #9656D5; stroke-width: 2.4; fill: none; marker-end: url(#arrowPurple); }
+      .dashFlow { stroke: #5F8BE8; stroke-width: 2.4; fill: none; stroke-dasharray: 8 6; marker-end: url(#arrowBlue); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="800" fill="#FFFFFF"/>
+  <circle cx="600" cy="405" r="340" fill="url(#halo)"/>
+
+  <!-- Header -->
+  <text x="600" y="48" text-anchor="middle" class="title">K-Storm Architecture</text>
+  <text x="600" y="74" text-anchor="middle" class="subtitle">LOCAL-FIRST MULTI-AGENT RESEARCH BRAINSTORMING</text>
+  <line x1="55" y1="98" x2="1145" y2="98" stroke="#E7ECF3" stroke-width="1.4"/>
+
+  <!-- Left column -->
+  <g filter="url(#shadow)">
+    <rect x="35" y="125" width="250" height="210" rx="18" fill="url(#blueSoft)" stroke="#8FB4EA" stroke-width="2.2"/>
+    <rect x="35" y="125" width="250" height="6" rx="3" fill="url(#barBlue)"/>
+    <text x="160" y="166" text-anchor="middle" class="section">Research Console</text>
+    <text x="160" y="190" text-anchor="middle" class="sectionSub">REACT + VITE</text>
+
+    <rect x="120" y="208" width="80" height="44" rx="8" fill="#FFFFFF" stroke="#7FA7E8" stroke-width="1.8"/>
+    <line x1="134" y1="222" x2="186" y2="222" stroke="#3F7EE8" stroke-width="2.7" opacity=".58"/>
+    <line x1="134" y1="236" x2="174" y2="236" stroke="#3F7EE8" stroke-width="2.4" opacity=".38"/>
+    <line x1="148" y1="260" x2="172" y2="260" stroke="#3F7EE8" stroke-width="2.4"/>
+
+    <rect x="62" y="276" width="196" height="38" rx="10" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.6"/>
+    <text x="160" y="300" text-anchor="middle" class="body">Template + Docs</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="35" y="380" width="250" height="160" rx="18" fill="#FBFCFF" stroke="#D5DAE2" stroke-width="2.2"/>
+    <rect x="35" y="380" width="250" height="6" rx="3" fill="#A7B0BF"/>
+    <text x="160" y="422" text-anchor="middle" class="section">Workspace</text>
+    <rect x="62" y="448" width="196" height="32" rx="8" fill="#F6F8FB" stroke="#E1E6EF"/>
+    <text x="160" y="469" text-anchor="middle" class="bodySmall">New Discussion</text>
+    <rect x="62" y="490" width="196" height="32" rx="8" fill="#F6F8FB" stroke="#E1E6EF"/>
+    <text x="160" y="511" text-anchor="middle" class="bodySmall">Debate / Report</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="35" y="590" width="250" height="150" rx="18" fill="url(#purpleSoft)" stroke="#D3C3F5" stroke-width="2.2"/>
+    <rect x="35" y="590" width="250" height="6" rx="3" fill="#9656D5"/>
+    <text x="160" y="632" text-anchor="middle" class="section">Providers</text>
+    <text x="160" y="666" text-anchor="middle" class="bodySmall">OpenAI Compatible</text>
+    <text x="160" y="694" text-anchor="middle" class="bodySmall">Anthropic / Responses</text>
+    <text x="160" y="722" text-anchor="middle" class="bodySmall">Local Mock</text>
+  </g>
+
+  <!-- Center top -->
+  <g filter="url(#shadow)">
+    <rect x="375" y="125" width="450" height="190" rx="20" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2.2"/>
+    <rect x="375" y="125" width="450" height="6" rx="3" fill="url(#barBlue)"/>
+    <text x="600" y="166" text-anchor="middle" class="section">Orchestration Core</text>
+    <text x="600" y="190" text-anchor="middle" class="sectionSub">FASTAPI · STATE MACHINE · ROUTER</text>
+
+    <rect x="398" y="232" width="124" height="52" rx="12" fill="url(#greenSoft)" stroke="#A8D79A" stroke-width="1.8"/>
+    <text x="460" y="255" text-anchor="middle" class="node">API</text>
+    <text x="460" y="275" text-anchor="middle" class="nodeSub">runs</text>
+
+    <rect x="538" y="232" width="124" height="52" rx="12" fill="url(#orangeSoft)" stroke="#F0B46D" stroke-width="1.8"/>
+    <text x="600" y="255" text-anchor="middle" class="node">Scheduler</text>
+    <text x="600" y="275" text-anchor="middle" class="nodeSub">state</text>
+
+    <rect x="678" y="232" width="124" height="52" rx="12" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="1.8"/>
+    <text x="740" y="255" text-anchor="middle" class="node">Router</text>
+    <text x="740" y="275" text-anchor="middle" class="nodeSub">model</text>
+  </g>
+
+  <!-- Center main -->
+  <g filter="url(#shadow)">
+    <rect x="345" y="380" width="510" height="245" rx="20" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2.2"/>
+    <rect x="345" y="380" width="510" height="6" rx="3" fill="#F0B46D"/>
+    <text x="600" y="422" text-anchor="middle" class="section">Agent Deliberation Ring</text>
+    <text x="600" y="446" text-anchor="middle" class="sectionSub">PARALLEL ROUND · SERIAL REFINE · IR</text>
+
+    <circle cx="600" cy="522" r="58" fill="url(#coreGrad)" stroke="#F0B46D" stroke-width="2.4"/>
+    <circle cx="600" cy="522" r="39" fill="#FFFFFF" stroke="#F2CC8D" stroke-width="1.4"/>
+    <text x="600" y="518" text-anchor="middle" class="node">Debate</text>
+    <text x="600" y="538" text-anchor="middle" class="node">Core</text>
+
+    <rect x="374" y="470" width="142" height="56" rx="13" fill="url(#blueSoft)" stroke="#93B6EA" stroke-width="2"/>
+    <text x="445" y="494" text-anchor="middle" class="node">Novelty</text>
+    <text x="445" y="514" text-anchor="middle" class="nodeSub">directions</text>
+
+    <rect x="684" y="470" width="142" height="56" rx="13" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="2"/>
+    <text x="755" y="494" text-anchor="middle" class="node">Mechanism</text>
+    <text x="755" y="514" text-anchor="middle" class="nodeSub">causal chain</text>
+
+    <rect x="374" y="552" width="142" height="56" rx="13" fill="url(#greenSoft)" stroke="#A8D79A" stroke-width="2"/>
+    <text x="445" y="576" text-anchor="middle" class="node">Feasibility</text>
+    <text x="445" y="596" text-anchor="middle" class="nodeSub">cost</text>
+
+    <rect x="684" y="552" width="142" height="56" rx="13" fill="url(#orangeSoft)" stroke="#F0B46D" stroke-width="2"/>
+    <text x="755" y="576" text-anchor="middle" class="node">Reviewer</text>
+    <text x="755" y="596" text-anchor="middle" class="nodeSub">risk</text>
+
+    <path d="M516 498C545 479 570 473 600 477C630 473 655 479 684 498" stroke="#A7B0BF" stroke-width="1.5" fill="none"/>
+    <path d="M516 580C545 599 570 605 600 599C630 605 655 599 684 580" stroke="#A7B0BF" stroke-width="1.5" fill="none"/>
+    <line x1="516" y1="498" x2="558" y2="512" stroke="#A7B0BF" stroke-width="1.5"/>
+    <line x1="684" y1="498" x2="642" y2="512" stroke="#A7B0BF" stroke-width="1.5"/>
+    <line x1="516" y1="580" x2="558" y2="536" stroke="#A7B0BF" stroke-width="1.5"/>
+    <line x1="684" y1="580" x2="642" y2="536" stroke="#A7B0BF" stroke-width="1.5"/>
+  </g>
+
+  <!-- Right column -->
+  <g filter="url(#shadow)">
+    <rect x="935" y="125" width="230" height="615" rx="20" fill="#FFF8FC" stroke="#D77BD5" stroke-width="2.2"/>
+    <rect x="935" y="125" width="230" height="6" rx="3" fill="#C85BD4"/>
+    <text x="1050" y="166" text-anchor="middle" class="section">Artifact Pipeline</text>
+    <text x="1050" y="190" text-anchor="middle" class="sectionSub">DISCUSSION → REPORT</text>
+
+    <rect x="965" y="220" width="170" height="46" rx="11" fill="#FFFFFF" stroke="#1F2937" stroke-width="1.9"/>
+    <text x="1050" y="249" text-anchor="middle" class="body">Moderator</text>
+
+    <rect x="965" y="300" width="170" height="46" rx="11" fill="#F3E8FF" stroke="#C68BE2" stroke-width="1.9"/>
+    <text x="1050" y="329" text-anchor="middle" class="body">IR Summary</text>
+
+    <rect x="965" y="380" width="170" height="62" rx="11" fill="#FFFFFF" stroke="#1F2937" stroke-width="1.9"/>
+    <text x="1050" y="406" text-anchor="middle" class="body">Structured IR</text>
+    <text x="1050" y="427" text-anchor="middle" class="tiny">evidence · conflict</text>
+
+    <rect x="965" y="490" width="170" height="46" rx="11" fill="#FFEBCB" stroke="#F0B46D" stroke-width="1.9"/>
+    <text x="1050" y="519" text-anchor="middle" class="body">Evidence Check</text>
+
+    <rect x="965" y="574" width="170" height="46" rx="11" fill="#F3E8FF" stroke="#C68BE2" stroke-width="1.9"/>
+    <text x="1050" y="603" text-anchor="middle" class="body">Output Agent</text>
+
+    <rect x="965" y="658" width="170" height="50" rx="11" fill="#FFFFFF" stroke="#1F2937" stroke-width="1.9"/>
+    <text x="1050" y="689" text-anchor="middle" class="node">Markdown</text>
+
+    <line x1="1050" y1="266" x2="1050" y2="300" class="purpleFlow"/>
+    <line x1="1050" y1="346" x2="1050" y2="380" class="purpleFlow"/>
+    <line x1="1050" y1="442" x2="1050" y2="490" class="purpleFlow"/>
+    <line x1="1050" y1="536" x2="1050" y2="574" class="purpleFlow"/>
+    <line x1="1050" y1="620" x2="1050" y2="658" class="purpleFlow"/>
+  </g>
+
+  <!-- Bottom persistence -->
+  <g filter="url(#shadow)">
+    <rect x="345" y="660" width="510" height="80" rx="18" fill="#F9FAFB" stroke="#D5DAE2" stroke-width="2.2"/>
+    <rect x="345" y="660" width="510" height="6" rx="3" fill="#239553"/>
+    <text x="600" y="696" text-anchor="middle" class="section">Local Persistence</text>
+    <text x="600" y="723" text-anchor="middle" class="bodySmall">SQLite: history · messages · IR · report · refs</text>
+  </g>
+
+  <!-- Arrows -->
+  <path d="M285 230H375" class="blueFlow"/>
+  <path d="M600 315V380" class="darkFlow"/>
+  <path d="M855 505H935" class="blueFlow"/>
+  <path d="M600 625V660" class="greenFlow"/>
+  <path d="M285 665H345" class="dashFlow"/>
+  <path d="M825 243H965" class="dashFlow"/>
+  <path d="M285 460H345" stroke="#CBD5E1" stroke-width="2.2" fill="none" marker-end="url(#arrowDark)"/>
+
+  <rect x="313" y="200" width="42" height="24" rx="6" fill="#FFFFFF" opacity=".96"/>
+  <text x="334" y="217" text-anchor="middle" class="tiny">input</text>
+  <rect x="876" y="475" width="34" height="24" rx="6" fill="#FFFFFF" opacity=".96"/>
+  <text x="893" y="492" text-anchor="middle" class="tiny">IR</text>
+  <rect x="612" y="632" width="58" height="24" rx="6" fill="#FFFFFF" opacity=".96"/>
+  <text x="641" y="649" text-anchor="middle" class="tiny">persist</text>
+
+  <text x="600" y="778" text-anchor="middle" class="tiny">K-Storm v1.6 · Local-first research brainstorming · MIT License</text>
+</svg>
