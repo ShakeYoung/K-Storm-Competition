@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 import json
 import re
+import threading
 from uuid import uuid4
 
 from app.agents.registry import (
@@ -31,6 +32,7 @@ from app.schemas.models import (
 from app.storage import db
 
 _CANCELED_RUNS: set[str] = set()
+_RETRY_CALLBACK_LOCK = threading.Lock()  # 序列化并发 retry_callback 的 read-modify-write
 
 STEP_ESTIMATES = {
     "template": 5,
@@ -1482,9 +1484,10 @@ def retry_callback(run_id: str, step_key: str, base_label: str):
     def _callback(attempt: int, max_retries: int, reason: str) -> None:
         label = f"{base_label}(第 {attempt}/{max_retries} 次重试:{reason})"
         try:
-            latest = db.get_run(run_id)
-            timeline = update_timeline_label(latest.timeline, step_key, label)
-            db.update_run(run_id, current_step=label, timeline=timeline)
+            with _RETRY_CALLBACK_LOCK:
+                latest = db.get_run(run_id)
+                timeline = update_timeline_label(latest.timeline, step_key, label)
+                db.update_run(run_id, current_step=label, timeline=timeline)
         except Exception:
             pass
 
