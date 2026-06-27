@@ -120,13 +120,13 @@ h3 { font-size: 15px; font-weight: 720; }
 
 .brand-mark {
   align-items: center;
-  background: linear-gradient(145deg, var(--accent), var(--accent-strong));
-  border-radius: 12px;
-  color: #ffffff;
+  border-radius: 10px;
   display: flex;
   height: 40px;
   justify-content: center;
+  overflow: hidden;
   width: 40px;
+  flex: 0 0 40px;
 }
 
 .brand p {

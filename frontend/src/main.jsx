@@ -1015,7 +1015,7 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">
-            <Brain size={24} strokeWidth={2.2} />
+            <img src="/favicon.svg" alt="K-Storm" style={{ width: 28, height: 28, display: "block" }} />
           </div>
           <div>
             <h1>K-Storm</h1>

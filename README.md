@@ -6,10 +6,10 @@
 
 **Local multi-agent research topic brainstorming**
 
-Turn your research template + uploaded documents → structured briefing → controlled multi-agent discussion → Markdown topic selection report.
+Research template + uploaded documents → structured briefing → controlled multi-agent discussion → Markdown topic-selection report.
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square)](https://github.com/ShakeYoung/K-Storm/blob/main/LICENSE)
-[![Version](https://img.shields.io/badge/version-v1.8-green.svg?style=flat-square)](https://github.com/ShakeYoung/K-Storm)
+[![Version](https://img.shields.io/badge/version-v2.0-blue.svg?style=flat-square)](https://github.com/ShakeYoung/K-Storm)
 [![Python](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
 [![React](https://img.shields.io/badge/react-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -22,11 +22,11 @@ Turn your research template + uploaded documents → structured briefing → con
 
 ## ⚡ Overview
 
-K-Storm is a **fully local** research topic brainstorming MVP. Multiple AI agents (Novelty, Mechanism, Feasibility, Reviewer) hold a structured, multi-round discussion on your research question, then produce a ready-to-use Markdown report for thesis proposals or group meetings.
+K-Storm is a **fully local** research topic brainstorming workbench. Multiple AI agents (Novelty, Mechanism, Feasibility, Reviewer) hold a structured multi-round discussion on your research question, then produce a ready-to-use Markdown report for thesis proposals or group meetings.
 
 **Zero cloud dependency** — works out of the box with the built-in mock provider. Plug in any OpenAI-compatible or Anthropic API to unlock real agent reasoning.
 
-## 🪄 Discussion Modes (v1.8)
+## 🪄 Discussion Modes
 
 | Mode | Agents | Rounds | Best For |
 |:--|:--|:--|:--|
@@ -35,52 +35,52 @@ K-Storm is a **fully local** research topic brainstorming MVP. Multiple AI agent
 | **Quick Probe** | 1 | 1 | Fast sanity check on one question |
 | **Memory Query** | Select agents | 1–5 | Continue from a historical run's context |
 
-## 🧭 Research Stages (v1.8)
+## 🧭 Research Stages
 
-K-Storm automatically detects which phase of the research cycle you're in based on the information density in your template, and adjusts the output focus accordingly. You can also override the detection manually.
+K-Storm automatically detects which phase of the research cycle you're in based on the information density in your template, and adjusts all agent output focus accordingly. You can also override the detection manually.
 
 | Stage | When | What Changes |
 |:--|:--|:--|
 | **Topic Exploration** | Sparse input, no clear topic yet | Agents propose candidate topics and direction suggestions |
-| **Plan Refinement** | Well-defined topic + experiment design | Agents focus on pushing your current plan forward, not re-recommending new topics |
-| **Result Diagnosis** | Input contains experimental data or results | Agents interpret results, locate bottlenecks, and design follow-up experiments |
-| **Pivot Evaluation** | Input signals frustration, dead ends, or need to change direction | Agents evaluate whether to adjust the current line or pivot to an alternative |
+| **Plan Refinement** | Well-defined topic + experiment design | Agents focus on pushing your current plan forward |
+| **Result Diagnosis** | Input contains experimental data or results | Agents interpret results, locate bottlenecks, design follow-up experiments |
+| **Pivot Evaluation** | Input signals frustration, dead ends, or need to change direction | Agents evaluate whether to adjust or pivot |
 
 <details>
-<summary><b>How it works</b></summary>
+<summary><b>How stage detection works</b></summary>
 
 The inference engine examines your template fields for:
 
 1. **Result signals** — numerical data, fold-changes, sample sizes, p-values → `Result Diagnosis`
-2. **Design maturity** — mentions of controls, replicates, specific assays, animal models → `Result Diagnosis` if dense enough
-3. **Pivot signals** — keywords like "stuck", "bottleneck", "failed", "pivot", "switch direction" → `Pivot Evaluation`
+2. **Design maturity** — controls, replicates, specific assays, animal models → `Result Diagnosis` if dense enough
+3. **Pivot signals** — "stuck", "bottleneck", "failed", "pivot", "switch direction" → `Pivot Evaluation`
 4. **Plan maturity** — rich platform/constraints/target output + detailed existing basis (> 80 chars) → `Plan Refinement`
 5. **Default** — everything else → `Topic Exploration`
 
-The detected stage is injected into every agent prompt as a **stage label** + **stage goal**, and shapes the final report structure:
-- Topic Exploration → "Recommended Topics Top 3-5" section
-- Other stages → report body organized around advancing/diagnosing/adjusting the current line, with optional pivot suggestions at the end
+The detected stage is injected into every agent prompt as a **stage label + stage goal**, and shapes the final report structure.
 
 </details>
 
 ## ✨ Core Capabilities
 
 - 📋 **Structured template input** — research field, background, existing basis, constraints, goals
-- 📎 **Document upload** with type tagging and per-document notes
-- 🧩 **Hybrid large-document intake** — small uploads go through full-text intake; large uploads trigger per-document summary extraction + budgeted intake synthesis
+- 📎 **Document upload** with type tagging (design / experiment-data) and per-document notes
+- 🧩 **Hybrid large-document intake** — small uploads go through full-text intake; large uploads trigger per-document summary extraction + budgeted intake synthesis, with a user-visible warning if any documents are dropped due to budget overflow
 - 🤖 **4 discussion agents** — Novelty · Mechanism · Feasibility · Reviewer
-- 🎯 **Moderator** summarizes conflicts, omissions, and next-round questions
-- 📊 **Structured IR** — candidate directions, evidence chains, critique points
+- 🎯 **Moderator** — summarizes conflicts, omissions, and next-round questions
+- 📊 **Structured IR** — candidate directions (novelty / feasibility / risk / priority / evidence refs / critique refs / next actions), evidence chain, critique points
 - 📝 **Final Markdown report** — thesis-ready, with per-section copy buttons
-- 📚 **External references** — agents cite papers/blogs/datasets; two-tier extraction; dedicated references page
+- 📚 **External references** — agents cite papers/blogs/datasets; two-tier extraction; dedicated references page with grouped display and export
 - 🔄 **Run management** — stop, resume from failure, rerun from scratch
-- 🗂️ **History** — search, filter, open past runs, delete
-- 📤 **Export** — MD/PDF, JSON bundle, references export
-- ✅ **Validated generation** — explicit end markers + structural checks prevent half-finished agent messages from advancing the workflow
-- ⚙️ **Per-agent model assignment** — mix mock + OpenAI + Anthropic per agent slot
-- 🏷️ **Discussion naming** — optionally name each run for easy identification in history
-- ⚡ **Recommended config** — one-click model assignment based on agent role and available models
-- 📝 **Markdown briefing** — agent briefing blocks render inline Markdown formatting
+- 🗂️ **History** — search, filter by status, open past runs, delete
+- 📤 **Export** — MD / PDF (print dialog), ZIP bundle (report + debate + metadata), Run JSON
+- ✅ **Validated generation** — end markers + structural checks prevent half-finished messages from advancing; auto-retry with context-preserving continuation prompt
+- ⚙️ **Per-agent model assignment** — mix mock / OpenAI-compatible / Anthropic per agent slot
+- 🏷️ **Discussion naming** — name each run for easy identification in history
+- ⚡ **USTC-107 preset** — one-click model assignment for the USTC 107 platform (GLM5.2 / DeepSeek-V4)
+- 📝 **Markdown briefing rendering** — agent briefing blocks render inline Markdown
+- 🔒 **Thread-safe retry** — concurrent retry callbacks are lock-protected to prevent DB write conflicts
+- 🌊 **SSE streaming** — real-time run status push via Server-Sent Events
 
 ## 🏗️ Architecture
 
@@ -107,20 +107,18 @@ Intake Agent → dense briefing
   ↓
 Round 1 (optional parallel)
   ↓
-Moderator → conflict/omission summary
+Moderator → conflict/omission summary + next-round question list
   ↓
 Round 2+ (serial)
   ↓
 Per-agent IR summary snippets
   ↓
-Structured IR (compressed)
+Structured IR (candidate directions + evidence refs + critique points)
   ↓
 Output Agent → final Markdown report
 ```
 
 </details>
-
-Full architecture docs: [docs/ARCHITECTURE.zh-CN.md](docs/ARCHITECTURE.zh-CN.md)
 
 <details>
 <summary><b>Project Structure</b></summary>
@@ -129,20 +127,24 @@ Full architecture docs: [docs/ARCHITECTURE.zh-CN.md](docs/ARCHITECTURE.zh-CN.md)
 backend/
   app/
     agents/              Agent definitions and registry
-    model_providers/     Mock, OpenAI, Anthropic providers
+    model_providers/     Mock, OpenAI-compatible, Anthropic providers
     orchestrator/        Run execution state machine
     schemas/             Pydantic models
     storage/             SQLite database layer
-    static/              Legacy standalone UI
     main.py              FastAPI app entry point
 frontend/
+  public/
+    favicon.svg          App icon (browser favicon)
   src/
     main.jsx             React application
     styles/
-      app.css            Stylesheet
+      app.css            Stylesheet — light USTC blue theme
+assets/
+  k-storm-icon.svg       Project icon (1024×1024, for app packaging)
+  k-storm-architecture.svg
 docs/
-  ARCHITECTURE.zh-CN.md  Architecture documentation
-  K-STORM-ROADMAP.zh-CN.md  Evolution roadmap
+  ARCHITECTURE.zh-CN.md       Architecture documentation
+  K-STORM-ROADMAP.zh-CN.md    Evolution roadmap
 ```
 
 </details>
@@ -166,7 +168,7 @@ uvicorn app.main:app --reload --port 8000
 
 Default uses **mock provider** — no API key needed.
 
-### 2. Frontend (recommended)
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -174,36 +176,37 @@ npm install
 npm run dev
 ```
 
-Open <http://localhost:5173> for the full v1.8 experience.
-
-> The backend also serves a standalone UI at <http://localhost:8000> (legacy, no v1.8 features).
+Open <http://localhost:5173>.
 
 ### 3. Configure Models (optional)
 
-Browser-based model settings support:
+Open **Model Settings** in the top bar. Supported provider types:
 
 | Provider Type | Examples |
 |:--|:--|
-| OpenAI Compatible | DeepSeek, DashScope, OpenRouter, Ollama, SiliconFlow |
+| OpenAI Compatible | DeepSeek, DashScope, OpenRouter, Ollama, SiliconFlow, MiniMax |
 | OpenAI Responses | OpenAI |
 | Anthropic Messages | Claude |
 | Coding Plan | Kimi, 百炼, 火山引擎 |
+| USTC-107 preset | GLM5.2 / DeepSeek-V4 (one-click) |
 
 API keys stay in your browser's `localStorage` — never written to disk or SQLite.
 
 <details>
-<summary><b>Environment Variables (alternative)</b></summary>
+<summary><b>Common Base URLs</b></summary>
 
-```bash
-cp .env.example .env
-```
-
-```bash
-KS_MODEL_PROVIDER=mock        # default, no key needed
-# KS_MODEL_PROVIDER=openai
-# OPENAI_API_KEY=sk-your-key
-# OPENAI_MODEL=gpt-4.1-mini
-```
+| Provider | Base URL |
+|:--|:--|
+| Kimi Coding | `https://api.kimi.com/coding/v1` |
+| 百炼 Coding | `https://coding.dashscope.aliyuncs.com/v1` |
+| 火山引擎 Coding | `https://ark.cn-beijing.volces.com/api/coding/v3` |
+| DeepSeek | `https://api.deepseek.com/v1` |
+| DashScope | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| OpenAI | `https://api.openai.com/v1` |
+| OpenRouter | `https://openrouter.ai/api/v1` |
+| Ollama | `http://127.0.0.1:11434/v1` |
+| MiniMax | `https://api.minimax.io/v1` |
+| SiliconFlow | `https://api.siliconflow.cn/v1` |
 
 </details>
 
@@ -217,16 +220,23 @@ KS_MODEL_PROVIDER=mock        # default, no key needed
 | Agent orchestration | Custom state machine |
 | Model providers | Mock · OpenAI-compatible · Anthropic |
 
-## 📡 API Overview
+## 📡 API Reference
 
 ```text
 POST   /api/runs                          Create a new run
-GET    /api/runs/{run_id}                  Get run status and data
+GET    /api/runs/{run_id}                 Get run status and full data
+GET    /api/runs/{run_id}/stream          SSE stream — push on status/message change
+GET    /api/runs/{run_id}/messages        Get debate messages
+GET    /api/runs/{run_id}/report          Get final Markdown report
+POST   /api/runs/{run_id}/rerun           Rerun from scratch
 POST   /api/runs/{run_id}/resume          Resume a failed/canceled run
 POST   /api/runs/{run_id}/cancel          Cancel a running run
 POST   /api/runs/{run_id}/references      Extract or update external references
-GET    /api/history                        List past runs
-POST   /api/history/delete                 Delete selected runs
+POST   /api/memory/query                  Memory query against a completed run
+GET    /api/history                       List past runs
+POST   /api/history/delete                Delete selected runs
+POST   /api/models/discover               Discover available models from a provider
+POST   /api/documents/extract             Extract text from uploaded PDF/DOCX/TXT
 ```
 
 ## 📜 License
