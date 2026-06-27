@@ -252,7 +252,7 @@ def rerun_run(run_id: str) -> RunRecord:
         source = db.get_run(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Run not found") from exc
-    return rerun(source, get_model_provider())
+    return rerun(source, get_model_provider(source.model_settings))
 
 
 @app.post("/api/runs/{run_id}/cancel", response_model=RunRecord)
@@ -372,7 +372,7 @@ def memory_query(payload: MemoryQueryRequest) -> MemoryQueryResponse:
         raise HTTPException(status_code=404, detail="源 Run 不存在") from exc
     if source_run.status != "COMPLETED":
         raise HTTPException(status_code=400, detail="源 Run 尚未完成，无法作为记忆源")
-    provider = get_model_provider()
+    provider = get_model_provider(source_run.model_settings)
     answer = execute_memory_query(source_run, payload.question, payload.agent_key, provider)
     return MemoryQueryResponse(
         answer=answer,
