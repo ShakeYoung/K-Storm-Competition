@@ -341,6 +341,9 @@ def execute_run_safe(
             error=f"{step}:{str(exc)}",
             timeline=timeline,
         )
+    finally:
+        # run 进入终态后从取消集合中清除，防止集合无限增长
+        _CANCELED_RUNS.discard(run.run_id)
 
 
 def execute_focused_panel(
@@ -614,6 +617,8 @@ def resume_run_safe(
             error=f"{step}:{str(exc)}",
             timeline=timeline,
         )
+    finally:
+        _CANCELED_RUNS.discard(run.run_id)
 
 
 def rerun(source: RunRecord, provider: ModelProvider) -> RunRecord:
