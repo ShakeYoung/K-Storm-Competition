@@ -32,6 +32,57 @@ const emptyTemplate = {
   avoid_direction: "",
 };
 
+const SCENE_TEMPLATES = [
+  {
+    id: "undergrad-thesis",
+    label: "本科毕设选题",
+    template: {
+      field: "（请填写你的研究领域，如：计算机视觉、生物信息学、材料科学）",
+      background: "我是本科生，即将开始毕业设计。希望找到一个在本科阶段可以独立完成的选题，难度适中，有一定创新性，同时能在答辩中展示完整的研究过程。",
+      existing_basis: "已完成本专业主干课程，有一定的编程/实验操作能力。有导师指导，实验室有基本设备。",
+      extension_points: "希望选题能结合当前热点（如 AI 赋能、多模态数据、新材料等），并有清晰可操作的实验路线。",
+      core_question: "",
+      platforms: "（请填写可用的技术平台/工具，如：Python 编程环境、学校实验室设备、公开数据集）",
+      constraints: "时间：约 6 个月；经费有限；样本/数据依赖公开资源或导师已有数据集。",
+      target_output: "本科毕业论文 + 答辩 PPT，争取发表 1 篇会议论文或期刊短文。",
+      preferred_direction: "方法创新型 / 应用落地型，选题要有实验可行性。",
+      avoid_direction: "过于理论化、需要大规模计算集群或昂贵试剂耗材的方向。",
+    },
+  },
+  {
+    id: "grad-proposal",
+    label: "研究生开题构思",
+    template: {
+      field: "（请填写你的研究领域，如：肿瘤免疫、自然语言处理、新能源材料）",
+      background: "我是硕士/博士研究生，正在准备开题报告。需要在导师研究方向的框架内，找到一个有创新性、有发表潜力的具体课题切入点。",
+      existing_basis: "已阅读领域内近 3 年的核心文献（请补充关键结论）。实验室已有相关数据/样本/模型系统（请补充）。",
+      extension_points: "（请填写你已经有的初步想法或感兴趣的方向）",
+      core_question: "（如有初步科学问题，请填写；没有可留空让 K-Storm 协助提炼）",
+      platforms: "（请填写可用平台，如：RNA-seq、单细胞测序、动物模型、GPU 服务器、公共数据库）",
+      constraints: "科研周期：硕士约 2 年 / 博士约 4 年；需在 1 年内完成预实验验证方向可行性。",
+      target_output: "开题报告（面向导师和评审委员会）；中期至少 1 篇 SCI 一区论文。",
+      preferred_direction: "机制研究 / 方法创新 / 交叉学科，要有明确的 novelty 和可发表点。",
+      avoid_direction: "重复已有成熟结论的验证性工作；资源需求远超实验室现有条件的方向。",
+    },
+  },
+  {
+    id: "pivot-evaluation",
+    label: "课题转向评估",
+    template: {
+      field: "（请填写当前研究领域）",
+      background: "我目前正在推进的课题遇到了瓶颈或发现了偏差。需要评估是否应该调整当前路线，或转向备选方向。",
+      existing_basis: "当前课题已完成的实验结果/数据：（请填写已有进展，包括成功的和失败的实验）。已投入的资源：（时间、样本、试剂等）。",
+      extension_points: "（请描述当前遇到的问题：如结果与预期不符、实验重复性差、机制解释困难等）",
+      core_question: "（请填写当前课题的核心科学问题，以及你认为卡住的根本原因）",
+      platforms: "当前已有平台和工具：（请填写）；如转向，可调用的其他资源：（请填写）。",
+      constraints: "剩余科研时间：（请填写）；已消耗预算：（请填写）；转向的机会成本：（请评估）。",
+      target_output: "给导师/组会的转向评估报告；如转向，提供新方向的可行性分析。",
+      preferred_direction: "能复用现有数据/平台的方向；风险可控、周期可预估。",
+      avoid_direction: "需要从零开始学习全新技术栈的大转向；比当前课题风险更高的方向。",
+    },
+  },
+];
+
 const requiredFields = ["field", "background", "existing_basis"];
 
 const formFields = [
@@ -59,14 +110,14 @@ const agentSlots = [
 ];
 
 const agentRecommendations = {
-  intake: "推荐：长上下文、稳健理解模型，例如 GLM-5.1 / Kimi 长上下文 / DeepSeek Pro，用于全文消化模板和文档。",
-  novelty: "推荐：创造性强、响应较快的模型，例如 DeepSeek Flash / Qwen Plus，用于提出差异化方向。",
-  mechanism: "推荐：推理稳定、机制链条表达强的模型，例如 GLM / DeepSeek Pro / Qwen Max。",
-  feasibility: "推荐：成本适中且执行细节可靠的模型，例如 DeepSeek Flash / Qwen Plus，用于压实实验路线。",
-  reviewer: "推荐：批判性和长文本能力强的模型，例如 DeepSeek Pro / GLM-5.1，用于模拟审稿质疑。",
-  moderator: "推荐：总结和对比能力强的中高质量模型，用于提炼第 1 轮冲突点和第 2 轮问题清单。",
-  group_summarizer: "推荐：结构化能力强的模型，用于把多轮讨论压缩成稳定 IR。",
-  output: "推荐：质量最高、中文写作稳定的模型，用于生成最终 Markdown 报告。",
+  intake: "推荐：长上下文、稳健理解模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于全文消化模板和文档。",
+  novelty: "推荐：创造性强、响应较快的模型，例如 科大107平台 DeepSeek-V3 / DeepSeek-V4，用于提出差异化方向。",
+  mechanism: "推荐：推理稳定、机制链条表达强的模型，例如 科大107平台 GLM5.2 / DeepSeek-V4。",
+  feasibility: "推荐：成本适中且执行细节可靠的模型，例如 科大107平台 DeepSeek-V3，用于压实实验路线。",
+  reviewer: "推荐：批判性和长文本能力强的模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于模拟审稿质疑。",
+  moderator: "推荐：总结和对比能力强的中高质量模型，例如 科大107平台 GLM5.2，用于提炼第 1 轮冲突点和第 2 轮问题清单。",
+  group_summarizer: "推荐：结构化能力强的模型，例如 科大107平台 DeepSeek-V4，用于把多轮讨论压缩成稳定 IR。",
+  output: "推荐：质量最高、中文写作稳定的模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于生成最终 Markdown 报告。",
 };
 
 const apiTypes = [
@@ -81,8 +132,22 @@ const providerGroups = [
 ];
 
 const defaultModelSettings = {
-  version: 6,
+  version: 7,
   providers: [
+    {
+      id: "ustc-107",
+      name: "中国科大 107 算力平台",
+      category: "api",
+      api_key: "",
+      base_url: "https://107.ustc.edu.cn/v1",
+      api_type: "openai_compatible",
+      allow_insecure_tls: false,
+      models: [
+        { id: "deepseek-v4", name: "DeepSeek-V4", model: "deepseek-v4" },
+        { id: "glm5.2", name: "GLM5.2", model: "glm5.2" },
+        { id: "deepseek-v3", name: "DeepSeek-V3", model: "deepseek-v3" },
+      ],
+    },
     {
       id: "kimi-coding",
       name: "Kimi Coding Plan",
@@ -1287,6 +1352,26 @@ function TemplatePanel({
         >
           <span>{completion}%</span>
         </div>
+      </div>
+
+      {/* 场景预置模板 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "8px 12px", background: "var(--accent-soft)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-strong)", whiteSpace: "nowrap" }}>🎓 场景模板</span>
+        <select
+          style={{ flex: 1, fontSize: 12, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--panel-strong)", color: "var(--ink)", cursor: "pointer" }}
+          value=""
+          onChange={(event) => {
+            const found = SCENE_TEMPLATES.find((t) => t.id === event.target.value);
+            if (found) setTemplate((current) => ({ ...current, ...found.template }));
+            event.target.value = "";
+          }}
+        >
+          <option value="">选择预置场景，一键填入示例内容...</option>
+          {SCENE_TEMPLATES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </select>
+        <span style={{ fontSize: 11, color: "var(--muted)", whiteSpace: "nowrap" }}>填入后可直接编辑</span>
       </div>
 
       <label className="field" style={{ marginBottom: 4 }}>

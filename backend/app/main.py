@@ -29,6 +29,11 @@ from app.storage import db
 app = FastAPI(title="K-Storm API", version="0.1.0")
 
 KNOWN_MODEL_PRESETS = {
+    "ustc-107": [
+        {"id": "deepseek-v4", "name": "DeepSeek-V4", "model": "deepseek-v4"},
+        {"id": "glm5.2", "name": "GLM5.2", "model": "glm5.2"},
+        {"id": "deepseek-v3", "name": "DeepSeek-V3", "model": "deepseek-v3"},
+    ],
     "kimi-coding": [
         {"id": "kimi-for-coding", "name": "kimi-for-coding", "model": "kimi-for-coding"},
     ],

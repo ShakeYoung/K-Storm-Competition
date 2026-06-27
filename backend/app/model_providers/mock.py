@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import re
+import time
 
 from app.model_providers.base import ModelProvider
 
@@ -18,7 +18,7 @@ class MockModelProvider(ModelProvider):
         max_tokens: int | None = None,
         on_retry=None,
     ) -> str:
-        asyncio.sleep(0.6)
+        time.sleep(0.3)
         field = _extract(user_prompt, "研究领域") or "当前研究领域"
         target = _extract(user_prompt, "目标产出") or "开题报告/组会讨论"
         platforms = _extract(user_prompt, "可用技术平台") or "现有实验平台"
@@ -27,9 +27,22 @@ class MockModelProvider(ModelProvider):
 
         if agent_key == "intake":
             return (
-                f'建议将"{field}"的背景压缩为一个可验证问题：基于已有基础，优先寻找'
-                f'能用{platforms}在{constraints}内验证的关键变量，并把目标产出对齐到{target}。'
-                + '\n<<<END_OF_AGENT_MESSAGE>>>'
+                f'## 研究背景压缩\n\n'
+                f'**核心领域**：{field}\n\n'
+                f'**研究出发点**：基于已有基础，优先寻找能用 {platforms} 在 {constraints} 内验证的关键变量，'
+                f'并把目标产出对齐到 {target}。\n\n'
+                f'## 已知事实\n\n'
+                f'- **可用平台**：{platforms}\n'
+                f'- **资源约束**：{constraints}\n'
+                f'- **目标产出**：{target}\n'
+                f'- **偏好方向**：{preferred}\n\n'
+                f'## 未知问题\n\n'
+                f'- 关键调控变量是否可被现有平台直接测量？\n'
+                f'- 现有基础能否在约束条件内支撑一个完整验证闭环？\n\n'
+                f'## 机会点\n\n'
+                f'- 从已有基础延伸，降低从零铺开的风险\n'
+                f'- {preferred} 方向与现有资源匹配度较高\n\n'
+                + '<<<END_OF_INTAKE>>>'
             )
         if agent_key == "novelty":
             probe = _extract(user_prompt, "用户问题")
@@ -105,6 +118,33 @@ class MockModelProvider(ModelProvider):
                 f'[paper] Common pitfalls in {field} research proposals | Chen et al. | https://example.com/pitfalls-{field[:3]} | 2022 | 评审常见质疑点有文献归纳\n'
                 f'[blog] How to write a strong {target} | Academic Writing Blog | https://example.com/writing-guide | 2024 | 论证写作有结构化指南'
                 + '\n<<<END_OF_AGENT_MESSAGE>>>'
+            )
+        if agent_key == "moderator":
+            return (
+                f'## 第 1 轮汇总\n\n'
+                f'**冲突点**：\n'
+                f'- 创新性 Agent 侧重差异化方向，可行性 Agent 认为部分方向资源需求过高，存在分歧。\n'
+                f'- 机制 Agent 要求先收敛主链条，审稿人 Agent 要求同时准备批判性证据，优先级有冲突。\n\n'
+                f'**互补点**：\n'
+                f'- 各 Agent 均认可从已有基础出发、优先使用现有平台的策略。\n'
+                f'- 审稿人和可行性 Agent 在"先小规模验证"上达成共识。\n\n'
+                f'**遗漏信息**：\n'
+                f'- 尚未明确候选变量的具体测量指标。\n'
+                f'- 备选方向的资源需求尚未评估。\n\n'
+                f'**候选方向聚类**：\n'
+                f'- 方向 A：关键调控轴验证（创新性+机制均支持）\n'
+                f'- 方向 B：分层队列验证（可行性最高）\n'
+                f'- 方向 C：交叉平台延伸（创新性高但风险较高）\n\n'
+                f'**第 2 轮必须回应的问题**：\n'
+                f'1. 方向 A 的关键变量如何在现有平台上直接测量？\n'
+                f'2. 方向 B 的样本量是否满足统计功效要求？\n'
+                f'3. 方向 C 的技术复杂度能否在资源约束内控制？\n\n'
+                f'### 给结构化 IR 的要点摘要\n'
+                f'- 关键主张：三个候选方向各有侧重，建议按综合评分排序\n'
+                f'- 支撑依据：第 1 轮各 Agent 发言均有具体论据\n'
+                f'- 风险或反驳点：资源约束和创新边界是核心矛盾\n'
+                f'- 建议进入 IR 的下一步动作：明确各方向的关键验证实验\n\n'
+                + '<<<END_OF_MODERATOR_MESSAGE>>>'
             )
         if agent_key == "group_summarizer":
             return (
