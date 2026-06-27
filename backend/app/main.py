@@ -7,7 +7,7 @@ import ssl
 import urllib.error
 import urllib.request
 
-from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -302,6 +302,51 @@ def regenerate_references(run_id: str, payload: dict | None = Body(default=None)
     existing = source.external_references if merge else None
     external_references = extract_references(source.debate_messages, existing)
     return db.update_run(run_id, external_references=external_references)
+
+
+@app.post("/api/documents/extract")
+async def extract_documents(files: list[UploadFile] = File(...)) -> dict:
+    """从 PDF / DOCX / TXT 文件中提取纯文本，供前端直接写入 documents.content。"""
+    import io
+
+    results = []
+    for upload in files:
+        filename = upload.filename or "unknown"
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        data = await upload.read()
+        text = ""
+        error = ""
+        try:
+            if ext == "pdf":
+                import pdfplumber
+                with pdfplumber.open(io.BytesIO(data)) as pdf:
+                    pages = []
+                    for page in pdf.pages:
+                        page_text = page.extract_text()
+                        if page_text:
+                            pages.append(page_text)
+                    text = "\n\n".join(pages)
+            elif ext in {"docx", "doc"}:
+                from docx import Document as DocxDocument
+                doc = DocxDocument(io.BytesIO(data))
+                paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+                text = "\n".join(paragraphs)
+            else:
+                # 纯文本 / Markdown / CSV 等
+                text = data.decode("utf-8", errors="replace")
+        except Exception as exc:
+            error = str(exc)
+            text = ""
+
+        results.append({
+            "name": filename,
+            "ext": ext,
+            "text": text,
+            "chars": len(text),
+            "error": error,
+        })
+
+    return {"results": results}
 
 
 @app.get("/api/history", response_model=list[HistoryItem])

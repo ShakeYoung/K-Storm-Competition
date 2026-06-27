@@ -7,6 +7,7 @@ import {
   Check,
   Clipboard,
   Download,
+  FileUp,
   FlaskConical,
   History,
   LoaderCircle,
@@ -600,8 +601,17 @@ function App() {
   }, [modelSettings]);
 
   async function addDocuments(files) {
+    const BINARY_EXTS = new Set(["pdf", "docx", "doc"]);
+    const isBinary = (name) => BINARY_EXTS.has((name.split(".").pop() || "").toLowerCase());
+
+    // Split into text files (read locally) and binary files (extract via backend)
+    const textFiles = files.filter((f) => !isBinary(f.name));
+    const binaryFiles = files.filter((f) => isBinary(f.name));
+
     const nextDocuments = [];
-    for (const file of files) {
+
+    // Local text files
+    for (const file of textFiles) {
       nextDocuments.push({
         id: `doc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         name: file.name,
@@ -611,6 +621,30 @@ function App() {
         summary: "",
       });
     }
+
+    // Binary files: POST to /api/documents/extract
+    if (binaryFiles.length > 0) {
+      const form = new FormData();
+      for (const file of binaryFiles) form.append("files", file);
+      try {
+        const resp = await fetch(`${API_BASE}/api/documents/extract`, { method: "POST", body: form });
+        if (!resp.ok) throw new Error(`提取失败 ${resp.status}`);
+        const { results } = await resp.json();
+        for (const r of results) {
+          nextDocuments.push({
+            id: `doc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+            name: r.name,
+            doc_type: inferDocumentType(r.name),
+            content: r.error ? `[提取失败: ${r.error}]` : r.text,
+            note: "",
+            summary: r.error ? r.error : "",
+          });
+        }
+      } catch (err) {
+        setError(`文档提取出错：${err.message}`);
+      }
+    }
+
     setDocuments((current) => [...current, ...nextDocuments]);
   }
 
@@ -1504,22 +1538,31 @@ function TemplatePanel({
       <section className="document-upload">
         <div>
           <h3>上传文档</h3>
-          <p>支持文本类 design / experiment-data 文档，可添加注释。</p>
+          <p>支持 PDF、Word（docx）、TXT、Markdown 等格式，可添加注释供 Agent 参考。</p>
         </div>
-        <input
-          multiple
-          type="file"
-          onChange={(event) => {
-            addDocuments(Array.from(event.target.files || []));
-            event.target.value = "";
-          }}
-        />
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "7px 16px", background: "var(--accent-soft)", border: "1px solid var(--accent)", borderRadius: "var(--radius-sm)", fontSize: 13, fontWeight: 600, color: "var(--accent-strong)" }}>
+          <FileUp size={15} /> 选择文件（PDF / DOCX / TXT / MD）
+          <input
+            multiple
+            type="file"
+            accept=".pdf,.docx,.doc,.txt,.md,.csv,.json"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              addDocuments(Array.from(event.target.files || []));
+              event.target.value = "";
+            }}
+          />
+        </label>
         <div className="document-list">
           {documents.length ? (
-            documents.map((document) => (
+            documents.map((document) => {
+              const ext = (document.name.split(".").pop() || "").toUpperCase();
+              const extColor = { PDF: "#dc2626", DOCX: "#2563eb", DOC: "#2563eb", MD: "#7c3aed", TXT: "#4b5563" }[ext] || "#4b5563";
+              return (
               <div className="document-item" key={document.id}>
                 <div className="document-row">
-                  <strong>
+                  <strong style={{ display: "flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", background: extColor, color: "#fff", borderRadius: 4, letterSpacing: "0.04em" }}>{ext}</span>
                     {document.name}
                     <small>{formatChars(document.content?.length || 0)} 字符</small>
                   </strong>
@@ -1543,18 +1586,19 @@ function TemplatePanel({
                 <textarea
                   rows={2}
                   value={document.note}
-                  placeholder="为该文档添加注释"
+                  placeholder="为该文档添加注释（可选）"
                   onChange={(event) =>
                     updateDocument(document.id, { note: event.target.value })
                   }
                 />
                 {document.summary ? (
                   <div style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-                    <strong>预提取摘要：</strong>{document.summary}
+                    <strong>提取信息：</strong>{document.summary}
                   </div>
                 ) : null}
               </div>
-            ))
+              );
+            })
           ) : (
             <div className="empty-line">还没有上传文档。</div>
           )}
