@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import json
 import ssl
@@ -7,7 +8,7 @@ import urllib.error
 import urllib.request
 
 from fastapi import BackgroundTasks, Body, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -187,6 +188,45 @@ def get_run(run_id: str) -> RunRecord:
         return db.get_run(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Run not found") from exc
+
+
+@app.get("/api/runs/{run_id}/stream")
+async def stream_run(run_id: str) -> StreamingResponse:
+    """SSE 端点：run 状态或消息数量变化时推送完整 run 快照。"""
+    terminal = {"COMPLETED", "FAILED", "CANCELED"}
+
+    async def _gen():
+        prev_hash = None
+        # 最多等待 90 分钟（每 0.8s 检查一次）
+        for _ in range(6750):
+            try:
+                run = db.get_run(run_id)
+            except KeyError:
+                yield f"data: {json.dumps({'error': 'not_found'}, ensure_ascii=False)}\n\n"
+                return
+
+            msg_count = len(run.debate_messages or [])
+            h = f"{run.status}|{run.current_step}|{msg_count}"
+            if h != prev_hash:
+                prev_hash = h
+                yield f"data: {run.model_dump_json()}\n\n"
+
+            if run.status in terminal:
+                return
+
+            await asyncio.sleep(0.8)
+
+        yield f"data: {json.dumps({'error': 'timeout'})}\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.get("/api/runs/{run_id}/messages")

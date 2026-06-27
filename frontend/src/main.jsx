@@ -563,11 +563,13 @@ function App() {
   const [parallelFirstRound, setParallelFirstRound] = React.useState(false);
   const [documents, setDocuments] = React.useState([]);
   const pollRef = React.useRef(null);
+  const sseRef = React.useRef(null);
 
   React.useEffect(() => {
     loadHistory();
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
+      if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     };
   }, []);
 
@@ -677,7 +679,7 @@ function App() {
     }
   }
 
-  function startPolling(runId) {
+  function _startPolling(runId) {
     if (pollRef.current) window.clearInterval(pollRef.current);
     pollRef.current = window.setInterval(async () => {
       try {
@@ -700,6 +702,46 @@ function App() {
     }, 900);
   }
 
+  function startPolling(runId) {
+    // 优先使用 SSE，不支持时降级为轮询
+    if (typeof EventSource === "undefined") {
+      _startPolling(runId);
+      return;
+    }
+    // 关闭旧连接
+    if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+    if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
+
+    const sse = new EventSource(`${API_BASE}/api/runs/${runId}/stream`);
+    sseRef.current = sse;
+
+    sse.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.error) {
+          sse.close(); sseRef.current = null;
+          setLoading(false);
+          if (data.error !== "not_found") setError("连接异常，请刷新页面");
+          return;
+        }
+        setRun(data);
+        if (["COMPLETED", "FAILED", "CANCELED"].includes(data.status)) {
+          sse.close(); sseRef.current = null;
+          setLoading(false);
+          loadHistory();
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    };
+
+    sse.onerror = () => {
+      // SSE 断开时降级为轮询
+      sse.close(); sseRef.current = null;
+      _startPolling(runId);
+    };
+  }
+
   async function fetchRun(runId) {
     const response = await fetch(`${API_BASE}/api/runs/${runId}`);
     if (!response.ok) throw new Error(await readError(response));
@@ -710,6 +752,10 @@ function App() {
     if (pollRef.current) {
       window.clearInterval(pollRef.current);
       pollRef.current = null;
+    }
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
     }
     setLoading(true);
     setError("");
