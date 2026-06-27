@@ -474,7 +474,7 @@ def execute_focused_panel(
     ensure_not_canceled(run.run_id)
     structured_ir = parse_structured_ir_v2(group_summary, run.template_input, structured_brief, messages)
     group_summary = clean_structured_ir_markdown(group_summary)
-    ir_warnings = validate_structured_ir(structured_ir) if structured_ir else []
+    ir_warnings = document_budget_warnings(documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
     timeline = finish_timeline_step(timeline, "group_summary")
     # 提取外部引用(memory 模式合并源 run 的引用)
     existing_refs = None
@@ -805,7 +805,7 @@ def resume_run(
             run = update_run_checked(run.run_id, external_references=external_references)
     elif not run.structured_ir:
         structured_ir = parse_structured_ir_v2(group_summary, run.template_input, structured_brief, messages)
-        ir_warnings = validate_structured_ir(structured_ir) if structured_ir else []
+        ir_warnings = document_budget_warnings(run.documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
         external_references = extract_references(messages)
         run = update_run_checked(run.run_id, structured_ir=structured_ir, ir_warnings=ir_warnings, external_references=external_references)
 
@@ -962,7 +962,7 @@ def execute_run(
     ensure_not_canceled(run.run_id)
     structured_ir = parse_structured_ir_v2(group_summary, run.template_input, structured_brief, messages)
     group_summary = clean_structured_ir_markdown(group_summary)
-    ir_warnings = validate_structured_ir(structured_ir) if structured_ir else []
+    ir_warnings = document_budget_warnings(documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
     timeline = finish_timeline_step(timeline, "group_summary")
     run = update_run_checked(
         run.run_id,
@@ -1161,7 +1161,7 @@ def run_group_summary_step(
     ensure_not_canceled(run.run_id)
     structured_ir = parse_structured_ir_v2(group_summary, run.template_input, structured_brief, messages)
     group_summary = clean_structured_ir_markdown(group_summary)
-    ir_warnings = validate_structured_ir(structured_ir) if structured_ir else []
+    ir_warnings = document_budget_warnings(run.documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
     timeline = finish_timeline_step(timeline, "group_summary")
     run = update_run_checked(run.run_id, group_summary=group_summary, structured_ir=structured_ir, ir_warnings=ir_warnings, timeline=timeline)
     return group_summary, timeline, run
@@ -1816,6 +1816,48 @@ def budget_document_summaries(documents: list[UploadedDocument], max_chars: int 
         kept.append(_compact(entry, remaining))
         break
     return kept
+
+
+def document_budget_warnings(
+    documents: list[UploadedDocument],
+    max_chars: int = INTAKE_DOC_SUMMARY_BUDGET,
+) -> list[str]:
+    """检测因摘要超出 Intake 预算而被静默丢弃的文档，返回用户可见的警告列表。"""
+    if not documents or not needs_hybrid_intake(documents):
+        return []
+    entries: list[tuple[str, str]] = []
+    for document in documents:
+        payload = "\n".join(
+            item
+            for item in [
+                f"文档名称:{document.name}",
+                f"文档类型:{document.doc_type}",
+                f"用户注释:{document.note or '无'}",
+                f"摘要:{document.summary}" if document.summary else "",
+            ]
+            if item
+        )
+        if payload:
+            entries.append((document.name, payload))
+    if not entries:
+        return []
+    used = 0
+    for i, (name, entry) in enumerate(entries):
+        if used + len(entry) <= max_chars:
+            used += len(entry)
+        else:
+            remaining = max_chars - used
+            if remaining <= 120:
+                dropped = [n for n, _ in entries[i:]]
+            else:
+                dropped = [n for n, _ in entries[i + 1:]]
+            if dropped:
+                return [
+                    f"以下 {len(dropped)} 份文档因摘要总量超出 Intake 预算（{max_chars} 字符）"
+                    f"未能进入分析，可能影响结论完整性：{', '.join(dropped)}"
+                ]
+            break
+    return []
 
 
 def intake_prompt(template: TemplateInput, documents: list[UploadedDocument]) -> str:
