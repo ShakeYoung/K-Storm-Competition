@@ -1097,6 +1097,7 @@ function App() {
                 onExportPDF={() => exportPDF(run?.final_report, `K-Storm 报告 ${run?.run_id || ""}`)}
                 onNavigate={setActivePage}
               />
+              <DirectionPanel run={run} />
             </div>
           </div>
           <div className={`page ${activePage === "refs" ? "active" : ""}`}>
@@ -1382,6 +1383,7 @@ function TemplatePanel({
   runName = "",
   setRunName,
 }) {
+  const [selectedScene, setSelectedScene] = React.useState("");
   const isQuickOrMemory = mode === "quick" || mode === "memory";
   const submitLabel = mode === "quick" ? "快速探测" : mode === "memory" ? "查询记忆" : mode === "focused" ? "启动专题研讨" : "开始分析";
   return (
@@ -1405,11 +1407,13 @@ function TemplatePanel({
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-strong)", whiteSpace: "nowrap" }}>🎓 场景模板</span>
         <select
           style={{ flex: 1, fontSize: 12, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--panel-strong)", color: "var(--ink)", cursor: "pointer" }}
-          value=""
+          value={selectedScene}
           onChange={(event) => {
             const found = SCENE_TEMPLATES.find((t) => t.id === event.target.value);
-            if (found) setTemplate((current) => ({ ...current, ...found.template }));
-            event.target.value = "";
+            if (found) {
+              setTemplate((current) => ({ ...current, ...found.template }));
+              setSelectedScene(event.target.value);
+            }
           }}
         >
           <option value="">选择预置场景，一键填入示例内容...</option>
@@ -1932,6 +1936,11 @@ function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy
           {run?.final_report ? (
             <button className="icon-button" style={{ width: "100%" }} onClick={() => onNavigate("report")}>
               <Clipboard size={16} /> 查看报告
+            </button>
+          ) : null}
+          {run?.structured_ir?.candidate_directions?.length > 0 ? (
+            <button className="icon-button" style={{ width: "100%" }} onClick={() => onNavigate("report")}>
+              <Sparkles size={16} /> 方向卡片 ({run.structured_ir.candidate_directions.length})
             </button>
           ) : null}
         </div>
@@ -2936,6 +2945,140 @@ function reportTitleForRun(run) {
     auto: "最终报告",
   }[stage] || "最终报告";
 }
+
+// ── Module D: 候选方向可视化 ──────────────────────────────
+function parseScore(text) {
+  if (!text) return 0;
+  const frac = text.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+)/);
+  if (frac) return Math.round((parseFloat(frac[1]) / parseFloat(frac[2])) * 100);
+  const pct = text.match(/(\d+)\s*%/);
+  if (pct) return parseInt(pct[1]);
+  const kw = text;
+  if (/很高|非常高|极高/.test(kw)) return 90;
+  if (/较高|中高/.test(kw)) return 70;
+  if (/^高$|高，|高。|高（/.test(kw) || kw === "高") return 80;
+  if (/高/.test(kw)) return 78;
+  if (/中等|中低/.test(kw)) return 45;
+  if (/中高/.test(kw)) return 65;
+  if (/^中$/.test(kw.trim()) || kw === "中") return 52;
+  if (/中/.test(kw)) return 55;
+  if (/较低|偏低/.test(kw)) return 28;
+  if (/低/.test(kw)) return 22;
+  return 50;
+}
+
+function ScoreBar({ label, text, color }) {
+  const pct = parseScore(text);
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5, fontSize: 12 }}>
+        <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>{label}</span>
+        <span style={{ color, fontWeight: 700, fontSize: 12 }}>{text || "—"}</span>
+      </div>
+      <div style={{ height: 6, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3, transition: "width 0.8s cubic-bezier(.4,0,.2,1)" }} />
+      </div>
+    </div>
+  );
+}
+
+function DirectionCard({ dir }) {
+  const isTop = dir.priority === 1;
+  return (
+    <div style={{
+      border: isTop ? "2px solid var(--accent)" : "1px solid var(--border)",
+      borderRadius: "var(--radius)",
+      padding: "18px 20px",
+      background: isTop ? "var(--accent-soft)" : "var(--surface)",
+      position: "relative",
+    }}>
+      {isTop && (
+        <div style={{
+          position: "absolute", top: -1, right: 18,
+          background: "var(--accent)", color: "#fff",
+          fontSize: 11, fontWeight: 700, padding: "3px 12px",
+          borderRadius: "0 0 8px 8px", letterSpacing: "0.05em",
+        }}>★ 首推方向</div>
+      )}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: "50%", flexShrink: 0,
+          background: isTop ? "var(--accent)" : "var(--border)",
+          color: isTop ? "#fff" : "var(--text-muted)",
+          fontSize: 13, fontWeight: 700,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>{dir.priority}</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4, color: "var(--text)" }}>{dir.title}</div>
+          {dir.research_question && (
+            <div style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55 }}>{dir.research_question}</div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 28px", marginBottom: 14 }}>
+        <ScoreBar label="创新性" text={dir.novelty} color="var(--accent)" />
+        <ScoreBar label="可行性" text={dir.feasibility} color="#16a34a" />
+      </div>
+      {dir.risks?.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>风险</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {dir.risks.map((r, i) => (
+              <span key={i} style={{ fontSize: 11, padding: "3px 9px", background: "rgba(220,38,38,0.07)", color: "#b91c1c", borderRadius: 12, border: "1px solid rgba(220,38,38,0.18)" }}>{r}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {dir.next_actions?.length > 0 && (
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>下一步</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {dir.next_actions.map((a, i) => (
+              <span key={i} style={{ fontSize: 11, padding: "3px 9px", background: "var(--accent-soft)", color: "var(--accent-strong)", borderRadius: 12, border: "1px solid var(--accent)" }}>{a}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {dir.priority_reason && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+          <span style={{ fontWeight: 700, color: "var(--text)" }}>排序理由：</span>{dir.priority_reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DirectionPanel({ run }) {
+  const directions = React.useMemo(
+    () => (run?.structured_ir?.candidate_directions || []).slice().sort((a, b) => (a.priority || 99) - (b.priority || 99)),
+    [run?.structured_ir]
+  );
+
+  if (!run) return null;
+
+  return (
+    <section className="panel">
+      <div className="panel-title">
+        <div>
+          <h2>方向卡片</h2>
+          <p>
+            {directions.length
+              ? `来自 V1.5 结构化 IR 的 ${directions.length} 个候选研究方向，按综合优先级排序。`
+              : "完成一次完整讨论后将自动解析候选方向。"}
+          </p>
+        </div>
+      </div>
+      {directions.length ? (
+        <div style={{ display: "grid", gap: 14 }}>
+          {directions.map((dir) => <DirectionCard key={dir.id} dir={dir} />)}
+        </div>
+      ) : (
+        <div className="empty-line">暂无候选方向数据。</div>
+      )}
+    </section>
+  );
+}
+// ── End Module D ───────────────────────────────────────────
 
 function ReportView({
   run,
