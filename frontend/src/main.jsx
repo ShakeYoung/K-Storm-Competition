@@ -1274,31 +1274,29 @@ function ModeSelector({ mode, onChange, researchStage, setResearchStage, selecte
             onClick={() => onChange(m.key)}
           >
             <div className="mode-option-header">
-              <strong>{m.label}</strong>
+              <strong style={{ whiteSpace: "nowrap" }}>{m.label}</strong>
               <span className="mode-option-sub">{m.desc}</span>
             </div>
             <div className="mode-option-meta">
-              <span>{m.agents} Agent</span>
-              <span>{m.rounds} 轮</span>
+              <span>{m.agents} Agent · {m.rounds} 轮</span>
             </div>
           </button>
         ))}
       </div>
 
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)", marginBottom: 8 }}>科研阶段</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 8 }}>
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: "var(--muted)", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>科研阶段</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
           {stages.map(([key, label, desc]) => (
             <button
               key={key}
               className={`mode-option ${researchStage === key ? "active" : ""}`}
               onClick={() => setResearchStage(key)}
-              style={{ minHeight: 84 }}
+              style={{ flex: "1 1 auto", minWidth: 0 }}
+              title={desc}
             >
-              <div className="mode-option-header">
-                <strong style={{ display: "inline", wordBreak: "keep-all" }}>{label.slice(0, 2)}<br/>{label.slice(2)}</strong>
-                <span className="mode-option-sub">{desc}</span>
-              </div>
+              <strong style={{ whiteSpace: "nowrap", fontSize: 13 }}>{label}</strong>
+              <span className="mode-option-sub">{desc}</span>
             </button>
           ))}
         </div>
@@ -1572,16 +1570,6 @@ function TemplatePanel({
                     {document.name}
                     <small>{formatChars(document.content?.length || 0)} 字符</small>
                   </strong>
-                  <select
-                    value={document.doc_type}
-                    onChange={(event) =>
-                      updateDocument(document.id, { doc_type: event.target.value })
-                    }
-                  >
-                    <option value="design">design</option>
-                    <option value="experiment-data">experiment-data</option>
-                    <option value="other">other</option>
-                  </select>
                   <button
                     className="danger-button"
                     onClick={() => removeDocument(document.id)}
