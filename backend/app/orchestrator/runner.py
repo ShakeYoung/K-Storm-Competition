@@ -95,10 +95,10 @@ def generate_validated(
     """Generate text and validate structural completeness before advancing workflow.
 
     Strategy for truncated outputs (has body but missing end marker/sections):
-    - On 2nd attempt, only ask the model to *continue* and append the missing
-      sections, rather than regenerating the entire output from scratch.
-    - This is much faster because the continuation prompt is tiny compared to
-      the full original prompt.
+    - On 2nd attempt, ask the model to *continue* and append the missing sections.
+    - The continuation prompt includes the first 500 chars of the original user_prompt
+      so the model retains task context (research field, background, etc.) while
+      keeping token usage well below a full regeneration.
     """
     last_text = ""
     last_body = ""  # tracks the accumulated body for truncation-continuation
@@ -137,7 +137,15 @@ def generate_validated(
             last_body = body
             is_continuation = True
             missing_desc = "; ".join(last_errors)
-            prompt = f"""你上一条输出被截断了,缺少:{missing_desc}
+            # 在续写 prompt 中附带原始任务的前 500 字，避免模型因缺少上下文而续写偏题
+            task_hint = user_prompt[:500].rstrip()
+            if len(user_prompt) > 500:
+                task_hint += "\n[...原始任务已截断]"
+            prompt = f"""原始任务摘要(仅供续写时参考,不要重复输出其内容):
+{task_hint}
+
+---
+你上一条输出被截断了,缺少:{missing_desc}
 
 请直接续写以下内容的缺失部分(不要重复已有内容):
 
