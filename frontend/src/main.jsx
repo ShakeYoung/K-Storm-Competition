@@ -371,29 +371,35 @@ function downloadBlob(blob, filename) {
 }
 
 function bundleEntriesForRun(run) {
-  return [
-    {
-      name: "report.md",
-      data: run?.final_report || "",
-    },
-    {
-      name: "structured-ir.md",
-      data: run?.group_summary || "",
-    },
-    {
-      name: "metadata.json",
-      data: JSON.stringify(
-        {
-          run_id: run?.run_id,
-          status: run?.status,
-          exported_at: new Date().toISOString(),
-          field: run?.template_input?.field || "",
-        },
-        null,
-        2,
-      ),
-    },
-  ].filter((entry) => entry.data);
+  const entries = [];
+  if (run?.final_report) {
+    entries.push({ name: "report.md", data: run.final_report });
+  }
+  if (run?.group_summary) {
+    entries.push({ name: "structured-ir.md", data: run.group_summary });
+  }
+  if (run?.debate_messages?.length) {
+    const debateMD = run.debate_messages.map(
+      (msg) => `### ${msg.agent} · 第 ${msg.round} 轮\n\n${msg.content}`,
+    ).join("\n\n---\n\n");
+    entries.push({ name: "debate.md", data: `# 讨论记录\n\n${debateMD}` });
+  }
+  entries.push({
+    name: "metadata.json",
+    data: JSON.stringify(
+      {
+        run_id: run?.run_id,
+        status: run?.status,
+        exported_at: new Date().toISOString(),
+        field: run?.template_input?.field || "",
+        rounds: run?.rounds,
+        created_at: run?.created_at,
+      },
+      null,
+      2,
+    ),
+  });
+  return entries;
 }
 
 function buildBundleMD(run) {
@@ -907,7 +913,7 @@ function App() {
   }
 
   async function downloadRunBundleFile(sourceRun) {
-    if (!sourceRun?.final_report && !sourceRun?.group_summary) return;
+    if (!sourceRun?.final_report && !sourceRun?.group_summary && !sourceRun?.debate_messages?.length) return;
     downloadRunBundle(sourceRun);
   }
 
@@ -929,18 +935,18 @@ function App() {
   function exportPDF(content, title) {
     if (!content) return;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1a2a28;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#2f9d89;border-bottom:2px solid #2f9d89;padding-bottom:8px}
-      h2{font-size:18px;color:#1a2a28;margin-top:28px}
-      h3{font-size:15px;color:#51665f}
-      blockquote{border-left:3px solid #2f9d89;padding-left:12px;color:#51665f;margin:12px 0}
-      code{background:#f3f7f4;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#f3f7f4;padding:14px;border-radius:8px;overflow-x:auto}
+      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0F1C40;line-height:1.7;font-size:14px}
+      h1{font-size:24px;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding-bottom:8px}
+      h2{font-size:18px;color:#0F1C40;margin-top:28px}
+      h3{font-size:15px;color:#3B4F7A}
+      blockquote{border-left:3px solid #1E3A8A;padding-left:12px;color:#3B4F7A;margin:12px 0}
+      code{background:#F0F3FA;padding:2px 6px;border-radius:4px;font-size:13px}
+      pre{background:#F0F3FA;padding:14px;border-radius:8px;overflow-x:auto}
       table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #ccd9d2;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#e8efea;font-weight:700}
+      th,td{border:1px solid #E4EAF4;padding:8px 10px;text-align:left;font-size:13px}
+      th{background:#EBF0FF;font-weight:700}
       ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #ccd9d2;margin:20px 0}
+      hr{border:0;border-top:1px solid #E4EAF4;margin:20px 0}
       @media print{body{margin:0;padding:20px;max-width:none}}
     </style></head><body>${markdownToHtml(content)}</body></html>`;
     const win = window.open("", "_blank");
@@ -2008,7 +2014,7 @@ function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy
         <h3>导出</h3>
         <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
           <div><DownloadMenu label="报告" disabled={!run?.final_report} mdContent={run?.final_report} pdfContent={run?.final_report} pdfTitle={`K-Storm 报告 ${run?.run_id || ""}`} /></div>
-          <div><DownloadMenu label="打包" disabled={!run?.final_report && !run?.group_summary} mdContent={buildBundleMD(run)} pdfContent={buildBundleMD(run)} pdfTitle={`K-Storm 打包 ${run?.run_id || ""}`} /></div>
+          <div><DownloadMenu label="打包" disabled={!run?.final_report && !run?.group_summary && !run?.debate_messages?.length} mdContent={buildBundleMD(run)} pdfContent={buildBundleMD(run)} pdfTitle={`K-Storm 打包 ${run?.run_id || ""}`} /></div>
           <button className="icon-button" style={{ width: "100%" }} disabled={!run} onClick={onDownloadJson}>
             <Download size={16} /> Run JSON
           </button>
@@ -2140,18 +2146,18 @@ function DownloadMenu({ label, icon, mdContent, pdfContent, pdfTitle, disabled }
     const content = pdfContent || mdContent;
     if (!content) return;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${pdfTitle || "K-Storm"}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#1a2a28;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#2f9d89;border-bottom:2px solid #2f9d89;padding-bottom:8px}
-      h2{font-size:18px;color:#1a2a28;margin-top:28px}
-      h3{font-size:15px;color:#51665f}
-      blockquote{border-left:3px solid #2f9d89;padding-left:12px;color:#51665f;margin:12px 0}
-      code{background:#f3f7f4;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#f3f7f4;padding:14px;border-radius:8px;overflow-x:auto}
+      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0F1C40;line-height:1.7;font-size:14px}
+      h1{font-size:24px;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding-bottom:8px}
+      h2{font-size:18px;color:#0F1C40;margin-top:28px}
+      h3{font-size:15px;color:#3B4F7A}
+      blockquote{border-left:3px solid #1E3A8A;padding-left:12px;color:#3B4F7A;margin:12px 0}
+      code{background:#F0F3FA;padding:2px 6px;border-radius:4px;font-size:13px}
+      pre{background:#F0F3FA;padding:14px;border-radius:8px;overflow-x:auto}
       table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #ccd9d2;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#e8efea;font-weight:700}
+      th,td{border:1px solid #E4EAF4;padding:8px 10px;text-align:left;font-size:13px}
+      th{background:#EBF0FF;font-weight:700}
       ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #ccd9d2;margin:20px 0}
+      hr{border:0;border-top:1px solid #E4EAF4;margin:20px 0}
       @media print{body{margin:0;padding:20px;max-width:none}}
     </style></head><body>${markdownToHtml(content)}</body></html>`;
     const win = window.open("", "_blank");
@@ -3147,7 +3153,7 @@ function ReportView({
         </div>
         <div className="inline-actions multi-actions">
           <DownloadMenu label="报告" disabled={!run?.final_report} mdContent={run?.final_report} pdfContent={run?.final_report} pdfTitle={`K-Storm 报告 ${run?.run_id || ""}`} />
-          <DownloadMenu label="打包" disabled={!run?.final_report && !run?.group_summary} mdContent={buildBundleMD(run)} pdfContent={buildBundleMD(run)} pdfTitle={`K-Storm 打包 ${run?.run_id || ""}`} />
+          <DownloadMenu label="打包" disabled={!run?.final_report && !run?.group_summary && !run?.debate_messages?.length} mdContent={buildBundleMD(run)} pdfContent={buildBundleMD(run)} pdfTitle={`K-Storm 打包 ${run?.run_id || ""}`} />
           <button className="icon-button" disabled={!run} onClick={onDownloadJson}>
             <Download size={18} />
             <span>JSON</span>

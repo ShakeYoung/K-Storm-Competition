@@ -5,11 +5,11 @@
 
 /* ── Design Tokens ── */
 :root {
-  --bg: #F2F5FA;
-  --bg-soft: #EEF2FA;
-  --panel: rgba(255, 255, 255, 0.95);
-  --panel-strong: #FFFFFF;
-  --panel-muted: #F4F7FD;
+  --bg: #E8ECF5;
+  --bg-soft: #E2E8F3;
+  --panel: rgba(249, 250, 254, 0.96);
+  --panel-strong: #FAFBFE;
+  --panel-muted: #F0F3FA;
   --ink: #0F1C40;
   --ink-soft: #3B4F7A;
   --muted: #9BA8C2;
@@ -70,8 +70,8 @@ body {
   min-width: 320px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 16% 6%, rgba(30, 58, 138, 0.06), transparent 32%),
-    linear-gradient(135deg, #F2F5FA 0%, #EBF0FF 55%, #E4EAF4 100%);
+    radial-gradient(circle at 16% 6%, rgba(30, 58, 138, 0.09), transparent 32%),
+    linear-gradient(135deg, #E6EAF4 0%, #DDE4F5 55%, #D8E0F0 100%);
   color: var(--ink);
 }
 
