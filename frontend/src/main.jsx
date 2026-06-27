@@ -1021,8 +1021,8 @@ function App() {
             <Settings size={18} />
             <span>模型设置</span>
           </button>
-          <div className="status-pill">
-            <Sparkles size={16} />
+          <div className={`status-pill${loading ? " running" : ""}`}>
+            {loading ? <LoaderCircle size={16} className="spin" /> : <Sparkles size={16} />}
             {run?.status ?? "READY"}
           </div>
         </div>
@@ -2389,21 +2389,25 @@ function DebateView({ run }) {
           <div className="round">
             <div className="round-heading">第 {activeRound} 轮</div>
             <div className="message-grid">
-              {activeMessages.map((message) => (
-                <article className="agent-card" data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
-                  <div className="agent-card-header">
-                    <strong>{message.agent}</strong>
-                    <span className="agent-model-label">{message.model_label || ""}</span>
-                    <span className="content-head">
-                      <CopyButton text={message.content} />
-                    </span>
-                  </div>
-                  <div
-                    className="agent-card-body markdown-rendered"
-                    dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
-                  />
-                </article>
-              ))}
+              {activeMessages.map((message, idx) => {
+                const isStreaming = run?.status === "DEBATE_RUNNING" && idx === activeMessages.length - 1;
+                return (
+                  <article className={`agent-card${isStreaming ? " streaming" : ""}`} data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
+                    <div className="agent-card-header">
+                      <strong>{message.agent}</strong>
+                      <span className="agent-model-label">{message.model_label || ""}</span>
+                      <span className="content-head">
+                        {isStreaming && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, letterSpacing: "0.04em" }}>● 生成中</span>}
+                        <CopyButton text={message.content} />
+                      </span>
+                    </div>
+                    <div
+                      className="agent-card-body markdown-rendered"
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
+                    />
+                  </article>
+                );
+              })}
             </div>
           </div>
         </div>
