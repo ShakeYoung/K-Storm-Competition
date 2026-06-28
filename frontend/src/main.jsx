@@ -935,18 +935,18 @@ function App() {
   function exportPDF(content, title) {
     if (!content) return;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0F1C40;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding-bottom:8px}
-      h2{font-size:18px;color:#0F1C40;margin-top:28px}
-      h3{font-size:15px;color:#3B4F7A}
-      blockquote{border-left:3px solid #1E3A8A;padding-left:12px;color:#3B4F7A;margin:12px 0}
-      code{background:#F0F3FA;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#F0F3FA;padding:14px;border-radius:8px;overflow-x:auto}
+      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0A1628;line-height:1.7;font-size:14px}
+      h1{font-size:24px;color:#1A52B8;border-bottom:2px solid #1A52B8;padding-bottom:8px}
+      h2{font-size:18px;color:#0A1628;margin-top:28px}
+      h3{font-size:15px;color:#2C3E6A}
+      blockquote{border-left:3px solid #1A52B8;padding-left:12px;color:#2C3E6A;margin:12px 0}
+      code{background:#F2F6FD;padding:2px 6px;border-radius:4px;font-size:13px}
+      pre{background:#F2F6FD;padding:14px;border-radius:8px;overflow-x:auto}
       table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #E4EAF4;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#EBF0FF;font-weight:700}
+      th,td{border:1px solid #D6E0F2;padding:8px 10px;text-align:left;font-size:13px}
+      th{background:#E8F0FF;font-weight:700}
       ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #E4EAF4;margin:20px 0}
+      hr{border:0;border-top:1px solid #D6E0F2;margin:20px 0}
       @media print{body{margin:0;padding:20px;max-width:none}}
     </style></head><body>${markdownToHtml(content)}</body></html>`;
     const win = window.open("", "_blank");
@@ -2134,18 +2134,18 @@ function DownloadMenu({ label, icon, mdContent, pdfContent, pdfTitle, disabled }
     const content = pdfContent || mdContent;
     if (!content) return;
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${pdfTitle || "K-Storm"}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0F1C40;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#1E3A8A;border-bottom:2px solid #1E3A8A;padding-bottom:8px}
-      h2{font-size:18px;color:#0F1C40;margin-top:28px}
-      h3{font-size:15px;color:#3B4F7A}
-      blockquote{border-left:3px solid #1E3A8A;padding-left:12px;color:#3B4F7A;margin:12px 0}
-      code{background:#F0F3FA;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#F0F3FA;padding:14px;border-radius:8px;overflow-x:auto}
+      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0A1628;line-height:1.7;font-size:14px}
+      h1{font-size:24px;color:#1A52B8;border-bottom:2px solid #1A52B8;padding-bottom:8px}
+      h2{font-size:18px;color:#0A1628;margin-top:28px}
+      h3{font-size:15px;color:#2C3E6A}
+      blockquote{border-left:3px solid #1A52B8;padding-left:12px;color:#2C3E6A;margin:12px 0}
+      code{background:#F2F6FD;padding:2px 6px;border-radius:4px;font-size:13px}
+      pre{background:#F2F6FD;padding:14px;border-radius:8px;overflow-x:auto}
       table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #E4EAF4;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#EBF0FF;font-weight:700}
+      th,td{border:1px solid #D6E0F2;padding:8px 10px;text-align:left;font-size:13px}
+      th{background:#E8F0FF;font-weight:700}
       ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #E4EAF4;margin:20px 0}
+      hr{border:0;border-top:1px solid #D6E0F2;margin:20px 0}
       @media print{body{margin:0;padding:20px;max-width:none}}
     </style></head><body>${markdownToHtml(content)}</body></html>`;
     const win = window.open("", "_blank");
@@ -2341,8 +2341,212 @@ function formatChars(count) {
   return count >= 10000 ? `${(count / 10000).toFixed(1)} 万` : String(count);
 }
 
+/* ── Debate Workflow Visualizer ── */
+const FLOW_AGENTS = [
+  { key: "novelty",     label: "Novelty",     color: "#2D4DB5", bg: "#EDF2FF" },
+  { key: "mechanism",   label: "Mechanism",   color: "#6B4FB8", bg: "#F0F0FF" },
+  { key: "feasibility", label: "Feasibility", color: "#1A7A5E", bg: "#EDFAF6" },
+  { key: "reviewer",    label: "Reviewer",    color: "#B03050", bg: "#FFF3F3" },
+];
+
+function DebateFlowChart({ run, onSelectRound }) {
+  const messages  = run?.debate_messages ?? [];
+  const rounds    = [...new Set(messages.map((m) => m.round))].sort((a, b) => a - b);
+  const hasIntake = Boolean(run?.structured_brief);
+  const hasIR     = Boolean(run?.group_summary);
+  const hasReport = Boolean(run?.final_report);
+
+  // ── Layout constants ──
+  const LBL_W  = 62;   // left label column
+  const NR     = 15;   // all node radius (parallel and sequential both use NR)
+  const RP     = 5;    // rect padding around circles
+  const NS     = 88;   // node center-to-center spacing
+  const ROW_H  = 82;   // vertical distance between round rows
+  const INTAKE_CY = 28;
+
+  // X center of each agent slot
+  const ax = (i) => LBL_W + 14 + NR + i * NS;
+  const chainCenterX = (ax(0) + ax(3)) / 2;
+  const WRAP_X = ax(3) + NR + RP + 24; // where wrap arrow swings out
+
+  const firstRowCY = INTAKE_CY + NR + 38 + NR;
+  const rowCY = (ri) => firstRowCY + ri * ROW_H;
+
+  const footerCY = (rounds.length > 0 ? rowCY(rounds.length - 1) : firstRowCY) + NR + 36;
+  const irX   = chainCenterX - 54;
+  const repX  = chainCenterX + 54;
+
+  const SVG_W = WRAP_X + 22;
+  const SVG_H = footerCY + NR + 22;
+
+  const agentHasMsg = (key, r) =>
+    messages.some((m) => agentKeyFromDisplay(m.agent) === key && m.round === r);
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 14, marginBottom: 10, flexWrap: "wrap", justifyContent: "center" }}>
+        {FLOW_AGENTS.map((a) => (
+          <div key={a.key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: a.bg, border: `2px solid ${a.color}`, flexShrink: 0 }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: a.color }}>{a.label}</span>
+          </div>
+        ))}
+      </div>
+
+      <svg width={SVG_W} height={SVG_H} viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+           style={{ display: "block", fontFamily: "var(--font-sans)" }}>
+        <defs>
+          <marker id="fc-arr" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#9BA8C2" />
+          </marker>
+        </defs>
+
+        {/* ── 入口整合 node ── */}
+        <circle cx={chainCenterX} cy={INTAKE_CY} r={NR}
+                fill={hasIntake ? "var(--accent-soft)" : "transparent"}
+                stroke={hasIntake ? "var(--accent)" : "var(--border)"}
+                strokeWidth="2" strokeDasharray={hasIntake ? "none" : "3 2"} />
+        <text x={chainCenterX} y={INTAKE_CY} textAnchor="middle" dominantBaseline="middle"
+              fontSize="10" fontWeight="800" fill={hasIntake ? "var(--accent)" : "var(--muted)"}>入口</text>
+        <text x={chainCenterX} y={INTAKE_CY + NR + 11} textAnchor="middle"
+              fontSize="9" fill={hasIntake ? "var(--ink-soft)" : "var(--muted)"}>入口整合</text>
+
+        {/* intake → first round arrow */}
+        {rounds.length > 0 && (
+          <line x1={chainCenterX} y1={INTAKE_CY + NR + 1}
+                x2={chainCenterX} y2={firstRowCY - NR - 6}
+                stroke="#9BA8C2" strokeWidth="1.5" markerEnd="url(#fc-arr)" />
+        )}
+
+        {/* ── Round rows ── */}
+        {rounds.map((round, ri) => {
+          const cy    = rowCY(ri);
+          const isPar = round === 1;
+          const hasNext = ri < rounds.length - 1;
+          const nextCY  = rowCY(ri + 1);
+
+          return (
+            <g key={round}>
+              {/* Row label */}
+              <text x={LBL_W - 4} y={cy - 7} textAnchor="end" dominantBaseline="middle"
+                    fontSize="11" fontWeight="700" fill="var(--ink-soft)">第{round}轮</text>
+              <text x={LBL_W - 4} y={cy + 9} textAnchor="end" dominantBaseline="middle"
+                    fontSize="9"  fontWeight="700"
+                    fill={isPar ? "#1A7A5E" : "#B03050"}>
+                {isPar ? "并行" : "串行"}
+              </text>
+
+              {isPar ? (
+                /* ── Parallel: rectangle with same-size NR circles ── */
+                <g onClick={() => onSelectRound(round)} style={{ cursor: "pointer" }}>
+                  <rect x={ax(0) - NR - RP} y={cy - NR - RP}
+                        width={ax(3) - ax(0) + NR * 2 + RP * 2} height={(NR + RP) * 2}
+                        rx="10" fill="var(--panel-muted)"
+                        stroke="var(--border-strong)" strokeWidth="1.5" />
+                  {FLOW_AGENTS.map((a, i) => {
+                    const on = agentHasMsg(a.key, round);
+                    return (
+                      <g key={a.key}>
+                        <circle cx={ax(i)} cy={cy} r={NR}
+                                fill={on ? a.bg : "transparent"}
+                                stroke={on ? a.color : "var(--border)"}
+                                strokeWidth={on ? 2 : 1.5}
+                                strokeDasharray={!on ? "3 2" : "none"} />
+                        {on && (
+                          <text x={ax(i)} y={cy} textAnchor="middle" dominantBaseline="middle"
+                                fontSize="10" fontWeight="800" fill={a.color}>
+                            {a.label[0]}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+              ) : (
+                /* ── Sequential: chain ○ → ○ → ○ → ○ ── */
+                <g>
+                  {FLOW_AGENTS.map((a, i) => {
+                    const on = agentHasMsg(a.key, round);
+                    return (
+                      <g key={a.key} style={{ cursor: "pointer" }}
+                         onClick={() => onSelectRound(round)}>
+                        {i > 0 && (
+                          <line x1={ax(i - 1) + NR + 2} y1={cy}
+                                x2={ax(i) - NR - 2}     y2={cy}
+                                stroke="#9BA8C2" strokeWidth="1.5"
+                                markerEnd="url(#fc-arr)" />
+                        )}
+                        <circle cx={ax(i)} cy={cy} r={NR}
+                                fill={on ? a.bg : "transparent"}
+                                stroke={on ? a.color : "var(--border)"}
+                                strokeWidth="2"
+                                strokeDasharray={!on ? "3 2" : "none"} />
+                        <text x={ax(i)} y={cy} textAnchor="middle" dominantBaseline="middle"
+                              fontSize="10" fontWeight="800"
+                              fill={on ? a.color : "var(--muted)"}>
+                          {a.label[0]}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              )}
+
+              {/* ── Wrap arrow: R's right edge → N's left edge of next round ── */}
+              {hasNext && (
+                <path
+                  d={`M ${ax(3) + NR + RP + 1} ${cy}
+                      L ${WRAP_X} ${cy}
+                      Q ${WRAP_X + 14} ${cy} ${WRAP_X + 14} ${cy + ROW_H / 2}
+                      Q ${WRAP_X + 14} ${nextCY} ${WRAP_X} ${nextCY}
+                      L ${ax(0) - NR - 2} ${nextCY}`}
+                  fill="none" stroke="#9BA8C2" strokeWidth="1.5"
+                  markerEnd="url(#fc-arr)" />
+              )}
+            </g>
+          );
+        })}
+
+        {/* ── Down arrow: last round → IR ── */}
+        {rounds.length > 0 && (
+          <line x1={chainCenterX} y1={rowCY(rounds.length - 1) + NR + 2}
+                x2={chainCenterX} y2={footerCY - NR - 6}
+                stroke="#9BA8C2" strokeWidth="1.5" markerEnd="url(#fc-arr)" />
+        )}
+
+        {/* ── IR node ── */}
+        <circle cx={irX} cy={footerCY} r={NR}
+                fill={hasIR ? "var(--accent-soft)" : "transparent"}
+                stroke={hasIR ? "var(--accent)" : "var(--border)"}
+                strokeWidth="2" strokeDasharray={!hasIR ? "3 2" : "none"} />
+        <text x={irX} y={footerCY} textAnchor="middle" dominantBaseline="middle"
+              fontSize="10" fontWeight="800" fill={hasIR ? "var(--accent)" : "var(--muted)"}>IR</text>
+        <text x={irX} y={footerCY + NR + 11} textAnchor="middle"
+              fontSize="9" fill={hasIR ? "var(--ink-soft)" : "var(--muted)"}>IR 汇总</text>
+
+        {/* ── IR → Report arrow ── */}
+        <line x1={irX + NR + 2} y1={footerCY}
+              x2={repX - NR - 2} y2={footerCY}
+              stroke="#9BA8C2" strokeWidth="1.5" markerEnd="url(#fc-arr)" />
+
+        {/* ── Report node ── */}
+        <circle cx={repX} cy={footerCY} r={NR}
+                fill={hasReport ? "var(--accent-soft)" : "transparent"}
+                stroke={hasReport ? "var(--accent)" : "var(--border)"}
+                strokeWidth="2" strokeDasharray={!hasReport ? "3 2" : "none"} />
+        <text x={repX} y={footerCY} textAnchor="middle" dominantBaseline="middle"
+              fontSize="10" fontWeight="800" fill={hasReport ? "var(--accent)" : "var(--muted)"}>报</text>
+        <text x={repX} y={footerCY + NR + 11} textAnchor="middle"
+              fontSize="9" fill={hasReport ? "var(--ink-soft)" : "var(--muted)"}>最终报告</text>
+      </svg>
+    </div>
+  );
+}
+
 function DebateView({ run }) {
   const [activeRound, setActiveRound] = React.useState(1);
+  const [showChart, setShowChart] = React.useState(true);
   const grouped = React.useMemo(() => {
     const map = new Map();
     for (const message of run?.debate_messages ?? []) {
@@ -2366,7 +2570,21 @@ function DebateView({ run }) {
           <h2>讨论过程</h2>
           <p>第 1 轮可并行独立发言，第 2 轮起串行反驳/修正。</p>
         </div>
+        <button className="icon-button" onClick={() => setShowChart((v) => !v)}
+                style={{ fontSize: 12, padding: "4px 10px", opacity: 0.75 }}>
+          {showChart ? "隐藏流程图" : "显示流程图"}
+        </button>
       </div>
+
+      {showChart && (
+        <div style={{ background: "var(--panel-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "14px 12px 8px", marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "var(--muted)", marginBottom: 10, letterSpacing: "0.06em", textTransform: "uppercase" }}>Workflow · 点击轮次节点跳转</div>
+          <div style={{ display: "flex", justifyContent: "center" }}>
+            <DebateFlowChart run={run} onSelectRound={setActiveRound} />
+          </div>
+        </div>
+      )}
+
       {grouped.length ? (
         <div className="rounds">
           <div className="round-tabs">

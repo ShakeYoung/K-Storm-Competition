@@ -702,6 +702,14 @@ select:focus {
   text-align: center;
 }
 
+/* ── Workflow Flow Chart ── */
+.flow-chart-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.flow-chart-wrap::-webkit-scrollbar { height: 4px; }
+.flow-chart-wrap svg text { font-family: var(--font-sans); }
+
 /* ── Debate Stage ── */
 .rounds {
   display: grid;
