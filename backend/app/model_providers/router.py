@@ -50,6 +50,48 @@ class AgentModelRouter(ModelProvider):
             on_retry=on_retry,
         )
 
+    def generate_stream(
+        self,
+        *,
+        agent_key: str,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int | None = None,
+        on_retry=None,
+        on_chunk=None,
+    ) -> str:
+        """流式生成委托。若底层 client 不支持 generate_stream，降级为 generate()。"""
+        resolved = self._resolved.get(agent_key)
+        if resolved is None:
+            result = self.fallback.generate(
+                agent_key=agent_key,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=max_tokens,
+                on_retry=on_retry,
+            )
+            if on_chunk:
+                on_chunk(result)
+            return result
+        client = self._client_for(resolved)
+        if hasattr(client, "generate_stream"):
+            return client.generate_stream(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                max_tokens=max_tokens,
+                on_chunk=on_chunk,
+            )
+        # 降级：非流式 generate，结束后一次性回调
+        result = client.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            max_tokens=max_tokens,
+            on_retry=on_retry,
+        )
+        if on_chunk:
+            on_chunk(result)
+        return result
+
     def label_for(self, agent_key: str) -> str:
         resolved = self._resolved.get(agent_key)
         if resolved is None:

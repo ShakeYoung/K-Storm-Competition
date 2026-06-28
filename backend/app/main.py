@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.model_providers.factory import get_model_provider
-from app.orchestrator.runner import cancel_run, create_run_record, execute_memory_query, execute_run_safe, rerun, resume_run_safe
+from app.orchestrator.runner import cancel_run, create_run_record, execute_memory_query, execute_run_safe, get_stream_state, rerun, resume_run_safe
 from app.schemas.models import (
     HistoryDeleteRequest,
     HistoryItem,
@@ -31,9 +31,16 @@ app = FastAPI(title="K-Storm API", version="0.1.0")
 
 KNOWN_MODEL_PRESETS = {
     "ustc-107": [
-        {"id": "deepseek-v4", "name": "DeepSeek-V4", "model": "deepseek-v4"},
-        {"id": "glm5.2", "name": "GLM5.2", "model": "glm5.2"},
-        {"id": "deepseek-v3", "name": "DeepSeek-V3", "model": "deepseek-v3"},
+        {"id": "deepseek-v4-pro",          "name": "DeepSeek-V4-Pro（高阶）",      "model": "deepseek-v4-pro"},
+        {"id": "glm-5.2",                  "name": "GLM-5.2（高阶）",               "model": "glm-5.2"},
+        {"id": "deepseek-v4-flash",        "name": "DeepSeek-V4-Flash（通用）",    "model": "deepseek-v4-flash"},
+        {"id": "deepseek-v4-flash-ascend", "name": "DeepSeek-V4-Flash-Ascend",    "model": "deepseek-v4-flash-ascend"},
+        {"id": "qwen3.6-reasoner",         "name": "Qwen3.6-Reasoner（推理）",     "model": "qwen3.6-reasoner"},
+        {"id": "qwen3.6-chat",             "name": "Qwen3.6-Chat（通用）",         "model": "qwen3.6-chat"},
+        {"id": "qwen-reasoner",            "name": "Qwen-Reasoner",                "model": "qwen-reasoner"},
+        {"id": "qwen-chat",                "name": "Qwen-Chat",                    "model": "qwen-chat"},
+        {"id": "smart-default",            "name": "Smart/Default",                "model": "smart/default"},
+        {"id": "smart-reasoning",          "name": "Smart/Reasoning",              "model": "smart/reasoning"},
     ],
     "kimi-coding": [
         {"id": "kimi-for-coding", "name": "kimi-for-coding", "model": "kimi-for-coding"},
@@ -217,6 +224,51 @@ async def stream_run(run_id: str) -> StreamingResponse:
             await asyncio.sleep(0.8)
 
         yield f"data: {json.dumps({'error': 'timeout'})}\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@app.get("/api/runs/{run_id}/token-stream")
+async def token_stream(run_id: str) -> StreamingResponse:
+    """SSE 端点：推送当前正在生成的 agent 的逐字 token 流。
+    每 100 ms 检查一次 buffer；buffer 内容变化时才推送，减少空推。
+    run 进入终态时发送 {done: true} 并关闭流。
+    """
+    terminal = {"COMPLETED", "FAILED", "CANCELED"}
+
+    async def _gen():
+        prev_partial = None
+        # 最长 90 分钟（每 100ms 一次 = 54000 次）
+        for _ in range(54000):
+            try:
+                run = db.get_run(run_id)
+            except KeyError:
+                return
+
+            state = get_stream_state(run_id)
+            partial = state.get("partial", "")
+
+            if partial != prev_partial:
+                prev_partial = partial
+                yield f"data: {json.dumps(state, ensure_ascii=False)}\n\n"
+
+            if run.status in terminal:
+                # 最后再发一次（可能刚清 buffer）
+                final_state = get_stream_state(run_id)
+                yield f"data: {json.dumps({**final_state, 'done': True}, ensure_ascii=False)}\n\n"
+                return
+
+            await asyncio.sleep(0.1)
+
+        yield f"data: {json.dumps({'done': True, 'error': 'timeout'})}\n\n"
 
     return StreamingResponse(
         _gen(),

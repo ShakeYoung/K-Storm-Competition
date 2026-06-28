@@ -6,6 +6,7 @@ import ssl
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable
 
 
 MAX_TRANSIENT_RETRIES = 3
@@ -52,6 +53,80 @@ class OpenAICompatibleClient:
             payload["max_tokens"] = max_tokens
         data = self._post_chat(endpoint, payload, on_retry=on_retry)
         return _extract_openai_compatible_text(data)
+
+    def generate_stream(
+        self,
+        *,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int | None = None,
+        on_chunk: Callable[[str], None] | None = None,
+    ) -> str:
+        """流式生成：每个 token 调用 on_chunk(delta)，最终返回完整文本。
+        若流式请求失败，抛出 RuntimeError（调用方可降级为 generate()）。
+        """
+        endpoint = self._chat_endpoint()
+        payload: dict = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.35,
+            "stream": True,
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        ctx = _ssl_context(self.allow_insecure_tls)
+        accumulated: list[str] = []
+
+        try:
+            with urllib.request.urlopen(request, timeout=300, context=ctx) as response:
+                buf = b""
+                while True:
+                    chunk = response.read(4096)
+                    if not chunk:
+                        break
+                    buf += chunk
+                    # 按行解析 SSE 格式
+                    while b"\n" in buf:
+                        raw_line, buf = buf.split(b"\n", 1)
+                        line = raw_line.decode("utf-8").strip()
+                        if not line.startswith("data: "):
+                            continue
+                        payload_str = line[6:]
+                        if payload_str.strip() == "[DONE]":
+                            return "".join(accumulated)
+                        try:
+                            chunk_data = json.loads(payload_str)
+                            delta = (
+                                chunk_data.get("choices", [{}])[0]
+                                .get("delta", {})
+                                .get("content", "")
+                            )
+                            if delta:
+                                accumulated.append(delta)
+                                if on_chunk:
+                                    on_chunk(delta)
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            pass
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"流式请求失败：{detail}") from exc
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+            raise RuntimeError(f"流式连接失败：{exc}") from exc
+
+        return "".join(accumulated)
 
     def _post_chat(self, endpoint: str, payload: dict, attempt: int = 0, on_retry=None) -> dict:
         request = urllib.request.Request(

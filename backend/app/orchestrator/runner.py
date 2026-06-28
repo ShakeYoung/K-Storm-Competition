@@ -34,6 +34,34 @@ from app.storage import db
 _CANCELED_RUNS: set[str] = set()
 _RETRY_CALLBACK_LOCK = threading.Lock()  # 序列化并发 retry_callback 的 read-modify-write
 
+# ── 流式输出 buffer ──────────────────────────────────────────────────────────
+# 每个正在生成的 run 在这里保存当前 agent 的部分输出
+_STREAM_BUFFERS: dict[str, str] = {}      # run_id → 累积的 partial text
+_STREAM_META: dict[str, dict] = {}        # run_id → {agent, step_type, round}
+_STREAM_LOCK = threading.Lock()
+
+
+def set_stream_buffer(run_id: str, text: str, meta: dict | None = None) -> None:
+    with _STREAM_LOCK:
+        _STREAM_BUFFERS[run_id] = text
+        if meta is not None:
+            _STREAM_META[run_id] = meta
+
+
+def clear_stream_buffer(run_id: str) -> None:
+    with _STREAM_LOCK:
+        _STREAM_BUFFERS.pop(run_id, None)
+        _STREAM_META.pop(run_id, None)
+
+
+def get_stream_state(run_id: str) -> dict:
+    with _STREAM_LOCK:
+        return {
+            "partial": _STREAM_BUFFERS.get(run_id, ""),
+            **_STREAM_META.get(run_id, {}),
+        }
+
+
 STEP_ESTIMATES = {
     "template": 5,
     "doc_extract": 120,
@@ -91,6 +119,7 @@ def generate_validated(
     kind: str,
     stage_label: str,
     attempts: int = 2,
+    on_chunk=None,
 ) -> str:
     """Generate text and validate structural completeness before advancing workflow.
 
@@ -99,6 +128,9 @@ def generate_validated(
     - The continuation prompt includes the first 500 chars of the original user_prompt
       so the model retains task context (research field, background, etc.) while
       keeping token usage well below a full regeneration.
+
+    on_chunk: optional callable(delta: str) — called with each streaming token on the
+    first attempt only. Ignored on retries/continuations.
     """
     last_text = ""
     last_body = ""  # tracks the accumulated body for truncation-continuation
@@ -108,13 +140,34 @@ def generate_validated(
     is_continuation = False
 
     for attempt in range(attempts):
-        text = provider.generate(
-            agent_key=agent_key,
-            system_prompt=system_prompt,
-            user_prompt=prompt,
-            max_tokens=max_tokens,
-            on_retry=on_retry,
-        )
+        # 第一次尝试：若 provider 支持流式，且调用方提供了 on_chunk，则走流式路径
+        if attempt == 0 and on_chunk is not None and hasattr(provider, "generate_stream"):
+            try:
+                text = provider.generate_stream(
+                    agent_key=agent_key,
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    max_tokens=max_tokens,
+                    on_retry=on_retry,
+                    on_chunk=on_chunk,
+                )
+            except RuntimeError:
+                # 流式失败降级为普通请求
+                text = provider.generate(
+                    agent_key=agent_key,
+                    system_prompt=system_prompt,
+                    user_prompt=prompt,
+                    max_tokens=max_tokens,
+                    on_retry=on_retry,
+                )
+        else:
+            text = provider.generate(
+                agent_key=agent_key,
+                system_prompt=system_prompt,
+                user_prompt=prompt,
+                max_tokens=max_tokens,
+                on_retry=on_retry,
+            )
         text = text or ""
 
         # If this was a continuation request, prepend the original body
@@ -1080,24 +1133,37 @@ def run_debate_agent(
         current_step=current_step,
         timeline=timeline,
     )
-    content = generate_validated(
-        provider,
-        agent_key=agent.key,
-        system_prompt=agent.system_prompt,
-        user_prompt=debate_prompt(
-            template=run.template_input,
-            brief=structured_brief,
-            round_number=round_number,
-            agent=agent,
-            history=[] if independent_first_round else messages,
-            independent_first_round=independent_first_round,
-            research_stage=run.research_stage,
-        ),
-        max_tokens=OUTPUT_LIMITS["debate"],
-        on_retry=retry_callback(run.run_id, step_key, current_step),
-        kind="debate",
-        stage_label=current_step,
-    )
+
+    # 流式 sink：每个 token 写入 buffer
+    _partial: list[str] = []
+    _meta = {"agent": agent.display_name, "step_type": "debate", "round": round_number}
+    def _sink(delta: str) -> None:
+        _partial.append(delta)
+        set_stream_buffer(run.run_id, "".join(_partial), _meta)
+
+    try:
+        content = generate_validated(
+            provider,
+            agent_key=agent.key,
+            system_prompt=agent.system_prompt,
+            user_prompt=debate_prompt(
+                template=run.template_input,
+                brief=structured_brief,
+                round_number=round_number,
+                agent=agent,
+                history=[] if independent_first_round else messages,
+                independent_first_round=independent_first_round,
+                research_stage=run.research_stage,
+            ),
+            max_tokens=OUTPUT_LIMITS["debate"],
+            on_retry=retry_callback(run.run_id, step_key, current_step),
+            kind="debate",
+            stage_label=current_step,
+            on_chunk=_sink,
+        )
+    finally:
+        clear_stream_buffer(run.run_id)
+
     ensure_not_canceled(run.run_id)
     messages.append(debate_message(round_number, agent, content, provider))
     timeline = finish_timeline_step(timeline, step_key)
@@ -1119,16 +1185,27 @@ def run_moderator_step(
         current_step="Moderator 汇总第 1 轮冲突与遗漏",
         timeline=timeline,
     )
-    moderator_note = generate_validated(
-        provider,
-        agent_key=MODERATOR_AGENT.key,
-        system_prompt=MODERATOR_AGENT.system_prompt,
-        user_prompt=moderator_prompt(run.template_input, structured_brief, messages, run.research_stage),
-        max_tokens=OUTPUT_LIMITS["moderator"],
-        on_retry=retry_callback(run.run_id, "moderator_round1", "Moderator 汇总第 1 轮冲突与遗漏"),
-        kind="moderator",
-        stage_label="Moderator 汇总第 1 轮冲突与遗漏",
-    )
+    _partial: list[str] = []
+    _meta = {"agent": MODERATOR_AGENT.display_name, "step_type": "moderator", "round": 1}
+    def _sink(delta: str) -> None:
+        _partial.append(delta)
+        set_stream_buffer(run.run_id, "".join(_partial), _meta)
+
+    try:
+        moderator_note = generate_validated(
+            provider,
+            agent_key=MODERATOR_AGENT.key,
+            system_prompt=MODERATOR_AGENT.system_prompt,
+            user_prompt=moderator_prompt(run.template_input, structured_brief, messages, run.research_stage),
+            max_tokens=OUTPUT_LIMITS["moderator"],
+            on_retry=retry_callback(run.run_id, "moderator_round1", "Moderator 汇总第 1 轮冲突与遗漏"),
+            kind="moderator",
+            stage_label="Moderator 汇总第 1 轮冲突与遗漏",
+            on_chunk=_sink,
+        )
+    finally:
+        clear_stream_buffer(run.run_id)
+
     ensure_not_canceled(run.run_id)
     messages.append(
         DebateMessage(
@@ -1239,24 +1316,36 @@ def run_debate_round_serial(
         step_key = debate_step_key(round_number, agent)
         timeline = start_timeline_step(timeline, step_key)
         run = update_run_checked(run.run_id, current_step=current_step, timeline=timeline)
-        content = generate_validated(
-            provider,
-            agent_key=agent.key,
-            system_prompt=agent.system_prompt,
-            user_prompt=debate_prompt(
-                template=run.template_input,
-                brief=structured_brief,
-                round_number=round_number,
-                agent=agent,
-                history=messages,
-                independent_first_round=False,
-                research_stage=run.research_stage,
-            ),
-            max_tokens=OUTPUT_LIMITS["debate"],
-            on_retry=retry_callback(run.run_id, step_key, current_step),
-            kind="debate",
-            stage_label=current_step,
-        )
+
+        _partial: list[str] = []
+        _meta = {"agent": agent.display_name, "step_type": "debate", "round": round_number}
+        def _sink(delta: str) -> None:
+            _partial.append(delta)
+            set_stream_buffer(run.run_id, "".join(_partial), _meta)
+
+        try:
+            content = generate_validated(
+                provider,
+                agent_key=agent.key,
+                system_prompt=agent.system_prompt,
+                user_prompt=debate_prompt(
+                    template=run.template_input,
+                    brief=structured_brief,
+                    round_number=round_number,
+                    agent=agent,
+                    history=messages,
+                    independent_first_round=False,
+                    research_stage=run.research_stage,
+                ),
+                max_tokens=OUTPUT_LIMITS["debate"],
+                on_retry=retry_callback(run.run_id, step_key, current_step),
+                kind="debate",
+                stage_label=current_step,
+                on_chunk=_sink,
+            )
+        finally:
+            clear_stream_buffer(run.run_id)
+
         ensure_not_canceled(run.run_id)
         messages.append(debate_message(round_number, agent, content, provider))
         timeline = finish_timeline_step(timeline, step_key)

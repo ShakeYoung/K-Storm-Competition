@@ -594,12 +594,16 @@ function App() {
   const [documents, setDocuments] = React.useState([]);
   const pollRef = React.useRef(null);
   const sseRef = React.useRef(null);
+  const tokenStreamRef = React.useRef(null);
+  const [streamingPartial, setStreamingPartial] = React.useState(null);
+  // streamingPartial: { partial: "", agent: "", step_type: "", round: 0 } | null
 
   React.useEffect(() => {
     loadHistory();
     return () => {
       if (pollRef.current) window.clearInterval(pollRef.current);
       if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
+      if (tokenStreamRef.current) { tokenStreamRef.current.close(); tokenStreamRef.current = null; }
     };
   }, []);
 
@@ -765,6 +769,35 @@ function App() {
     }, 900);
   }
 
+  function _startTokenStream(runId) {
+    if (tokenStreamRef.current) { tokenStreamRef.current.close(); tokenStreamRef.current = null; }
+    setStreamingPartial(null);
+    if (typeof EventSource === "undefined") return;
+
+    const tsse = new EventSource(`${API_BASE}/api/runs/${runId}/token-stream`);
+    tokenStreamRef.current = tsse;
+
+    tsse.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.done) {
+          tsse.close(); tokenStreamRef.current = null;
+          setStreamingPartial(null);
+          return;
+        }
+        if (data.partial) {
+          setStreamingPartial({ partial: data.partial, agent: data.agent || "", step_type: data.step_type || "debate", round: data.round || 0 });
+        } else {
+          setStreamingPartial(null);
+        }
+      } catch { /* 忽略 */ }
+    };
+
+    tsse.onerror = () => {
+      tsse.close(); tokenStreamRef.current = null;
+    };
+  }
+
   function startPolling(runId) {
     // 优先使用 SSE，不支持时降级为轮询
     if (typeof EventSource === "undefined") {
@@ -774,6 +807,9 @@ function App() {
     // 关闭旧连接
     if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     if (pollRef.current) { window.clearInterval(pollRef.current); pollRef.current = null; }
+
+    // 同时开启 token 流 SSE
+    _startTokenStream(runId);
 
     const sse = new EventSource(`${API_BASE}/api/runs/${runId}/stream`);
     sseRef.current = sse;
@@ -791,6 +827,7 @@ function App() {
         if (["COMPLETED", "FAILED", "CANCELED"].includes(data.status)) {
           sse.close(); sseRef.current = null;
           setLoading(false);
+          setStreamingPartial(null);
           loadHistory();
         }
       } catch {
@@ -1138,6 +1175,7 @@ function App() {
               onRerun={rerunCurrent}
               onCancel={cancelCurrent}
               onConfirmRerun={confirmRerunAndEdit}
+              streamingPartial={streamingPartial}
             />
           </div>
           <div className={`page ${activePage === "report" ? "active" : ""}`}>
@@ -1947,11 +1985,11 @@ function OverviewPage({ run, history, loading, onPageNavigate, onOpenRun }) {
   );
 }
 
-function DebatePage({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun }) {
+function DebatePage({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun, streamingPartial }) {
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <RunOverview run={run} loading={loading} activeRounds={activeRounds} onRerun={onRerun} onCancel={onCancel} onConfirmRerun={onConfirmRerun} />
-      <DebateView run={run} />
+      <DebateView run={run} streamingPartial={streamingPartial} />
     </div>
   );
 }
@@ -2655,7 +2693,7 @@ function DebateFlowChart({ run, onSelectRound }) {
   );
 }
 
-function DebateView({ run }) {
+function DebateView({ run, streamingPartial }) {
   const [activeRound, setActiveRound] = React.useState(1);
   const [showChart, setShowChart] = React.useState(true);
   const grouped = React.useMemo(() => {
@@ -2712,25 +2750,48 @@ function DebateView({ run }) {
           <div className="round">
             <div className="round-heading">第 {activeRound} 轮</div>
             <div className="message-grid">
-              {activeMessages.map((message, idx) => {
-                const isStreaming = run?.status === "DEBATE_RUNNING" && idx === activeMessages.length - 1;
+              {activeMessages.map((message) => (
+                <article className="agent-card" data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
+                  <div className="agent-card-header">
+                    <strong>{message.agent}</strong>
+                    <span className="agent-model-label">{message.model_label || ""}</span>
+                    <span className="content-head">
+                      <CopyButton text={message.content} />
+                    </span>
+                  </div>
+                  <div
+                    className="agent-card-body markdown-rendered"
+                    dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
+                  />
+                </article>
+              ))}
+              {/* 流式幻影卡片：当前正在生成的 agent token 流 */}
+              {(() => {
+                const sp = streamingPartial;
+                if (!sp?.partial || sp.round !== activeRound) return null;
+                // 若该 agent 的完整消息已在 activeMessages 中，不重复显示
+                const alreadyConfirmed = activeMessages.some((m) => m.agent === sp.agent);
+                if (alreadyConfirmed) return null;
+                // 剥掉尾部结束标记，避免显示给用户
+                const cleanPartial = sp.partial
+                  .replace(/<<<END_OF_[A-Z_]+>>>/g, "")
+                  .trimEnd();
+                if (!cleanPartial) return null;
                 return (
-                  <article className={`agent-card${isStreaming ? " streaming" : ""}`} data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
+                  <article className="agent-card streaming" data-agent={agentKeyFromDisplay(sp.agent)} key="__streaming__">
                     <div className="agent-card-header">
-                      <strong>{message.agent}</strong>
-                      <span className="agent-model-label">{message.model_label || ""}</span>
+                      <strong>{sp.agent}</strong>
                       <span className="content-head">
-                        {isStreaming && <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, letterSpacing: "0.04em" }}>● 生成中</span>}
-                        <CopyButton text={message.content} />
+                        <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700, letterSpacing: "0.04em" }}>● 生成中</span>
                       </span>
                     </div>
                     <div
                       className="agent-card-body markdown-rendered"
-                      dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
+                      dangerouslySetInnerHTML={{ __html: markdownToHtml(cleanPartial) }}
                     />
                   </article>
                 );
-              })}
+              })()}
             </div>
           </div>
         </div>
