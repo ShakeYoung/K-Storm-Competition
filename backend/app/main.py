@@ -19,6 +19,8 @@ from app.schemas.models import (
     HistoryItem,
     MemoryQueryRequest,
     MemoryQueryResponse,
+    MemorySearchRequest,
+    MemorySearchResponse,
     RunCreate,
     RunRecord,
     RunResumeRequest,
@@ -414,6 +416,39 @@ def history_location() -> dict[str, str]:
 @app.post("/api/history/delete")
 def delete_history(payload: HistoryDeleteRequest) -> dict[str, int]:
     return {"deleted": db.delete_runs(payload.run_ids)}
+
+
+@app.post("/api/memory/search", response_model=MemorySearchResponse)
+def memory_search(payload: MemorySearchRequest) -> MemorySearchResponse:
+    """跨 Run TF-IDF 知识检索：从所有已完成的 Run 的 StructuredIRV2 中检索相关知识单元。"""
+    from app.memory.extractor import extract_memory_entries
+    from app.memory.tfidf import search as tfidf_search
+
+    # 加载所有已完成 Run（最多 200 条，按更新时间倒序）
+    history = db.list_history(limit=200)
+    completed_ids = [h.run_id for h in history if h.status == "COMPLETED"]
+
+    all_entries = []
+    for run_id in completed_ids:
+        try:
+            run = db.get_run(run_id)
+            all_entries.extend(extract_memory_entries(run))
+        except Exception:
+            continue
+
+    hits = tfidf_search(
+        query=payload.question,
+        entries=all_entries,
+        top_k=payload.top_k,
+        field_filter=payload.field_filter,
+        entry_types=payload.entry_types if payload.entry_types else None,
+    )
+
+    return MemorySearchResponse(
+        hits=hits,
+        total_entries_indexed=len(all_entries),
+        total_runs_searched=len(completed_ids),
+    )
 
 
 @app.post("/api/memory/query", response_model=MemoryQueryResponse)

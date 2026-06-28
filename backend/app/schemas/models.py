@@ -250,4 +250,35 @@ class MemoryQueryResponse(BaseModel):
     agent_key: str = ""
 
 
+class MemoryEntry(BaseModel):
+    """从 StructuredIRV2 / StructuredBrief 中提取的知识单元，供 TF-IDF 索引。"""
+    entry_id: str                   # "{run_id}:{type}:{index}"
+    source_run_id: str
+    run_name: str = ""
+    field: str                      # 研究领域
+    entry_type: str                 # direction | key_claim | critique | decision_summary | opportunity
+    title: str
+    content: str                    # 用于 TF-IDF 的全文
+    priority: int = 0               # 候选方向的优先级分值
+    created_at: str
+
+
+class MemorySearchRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    field_filter: str = ""          # 可选：只在该研究领域内检索
+    top_k: int = Field(default=5, ge=1, le=20)
+    entry_types: list[str] = Field(default_factory=list)  # 空 = 不限类型
+
+
+class MemorySearchHit(BaseModel):
+    entry: MemoryEntry
+    score: float
+
+
+class MemorySearchResponse(BaseModel):
+    hits: list[MemorySearchHit]
+    total_entries_indexed: int
+    total_runs_searched: int
+
+
 JsonDict = dict[str, Any]
