@@ -1,268 +1,257 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 1200 800" font-family="Arial, Helvetica, 'Segoe UI', sans-serif" shape-rendering="geometricPrecision" text-rendering="optimizeLegibility">
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1600" viewBox="0 0 1200 800"
+     font-family="Arial, Helvetica, 'Segoe UI', sans-serif"
+     shape-rendering="geometricPrecision" text-rendering="optimizeLegibility">
   <defs>
-    <filter id="shadow" x="-12%" y="-12%" width="124%" height="135%">
-      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#0F172A" flood-opacity="0.11"/>
+    <filter id="sh" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.10"/>
     </filter>
-    <radialGradient id="halo" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#DCEBFF" stop-opacity="0.7"/>
-      <stop offset="70%" stop-color="#F0F7FF" stop-opacity="0.25"/>
-      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    <radialGradient id="halo" cx="50%" cy="50%" r="55%">
+      <stop offset="0%"   stop-color="#DCEBFF" stop-opacity="0.60"/>
+      <stop offset="65%"  stop-color="#F0F7FF" stop-opacity="0.20"/>
+      <stop offset="100%" stop-color="#FFFFFF"  stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="blueSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#F4FAFF"/><stop offset="100%" stop-color="#E6F1FF"/>
-    </linearGradient>
-    <linearGradient id="greenSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#F4FFF8"/><stop offset="100%" stop-color="#E6F7EE"/>
-    </linearGradient>
-    <linearGradient id="purpleSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FCF7FF"/><stop offset="100%" stop-color="#F0E6FF"/>
-    </linearGradient>
-    <linearGradient id="orangeSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FFF9F1"/><stop offset="100%" stop-color="#FFECCB"/>
-    </linearGradient>
-    <linearGradient id="redSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#FFF5F5"/><stop offset="100%" stop-color="#FFE4E4"/>
-    </linearGradient>
-    <linearGradient id="tealSoft" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#F0FFFC"/><stop offset="100%" stop-color="#D6F5EF"/>
-    </linearGradient>
-    <linearGradient id="coreGrad" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#E7F2FF"/><stop offset="100%" stop-color="#FFF4DF"/>
-    </linearGradient>
-    <linearGradient id="barBlue" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="#3F7EE8"/><stop offset="100%" stop-color="#16B8C5"/>
-    </linearGradient>
-    <marker id="arrowBlue" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#3F7EE8"/></marker>
-    <marker id="arrowDark" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#374151"/></marker>
-    <marker id="arrowGreen" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#239553"/></marker>
-    <marker id="arrowPurple" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#9656D5"/></marker>
-    <marker id="arrowRed" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#E05252"/></marker>
-    <marker id="arrowTeal" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="8" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#0EA58A"/></marker>
+    <!-- fill gradients -->
+    <linearGradient id="gBlue"   x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F4FAFF"/><stop offset="100%" stop-color="#E6F1FF"/></linearGradient>
+    <linearGradient id="gGreen"  x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F4FFF8"/><stop offset="100%" stop-color="#E6F7EE"/></linearGradient>
+    <linearGradient id="gPurple" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FCF7FF"/><stop offset="100%" stop-color="#F0E6FF"/></linearGradient>
+    <linearGradient id="gOrange" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFF9F1"/><stop offset="100%" stop-color="#FFECCB"/></linearGradient>
+    <linearGradient id="gRed"    x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#FFF5F5"/><stop offset="100%" stop-color="#FFE4E4"/></linearGradient>
+    <linearGradient id="gTeal"   x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F0FFFC"/><stop offset="100%" stop-color="#D6F5EF"/></linearGradient>
+    <linearGradient id="gCore"   x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#E7F2FF"/><stop offset="100%" stop-color="#FFF4DF"/></linearGradient>
+    <linearGradient id="gBar"    x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#3F7EE8"/><stop offset="100%" stop-color="#16B8C5"/></linearGradient>
+    <!-- arrowheads -->
+    <marker id="aBlue"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#3F7EE8"/></marker>
+    <marker id="aDark"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#374151"/></marker>
+    <marker id="aGreen"  viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#239553"/></marker>
+    <marker id="aPurple" viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#9656D5"/></marker>
+    <marker id="aRed"    viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#E05252"/></marker>
+    <marker id="aTeal"   viewBox="0 0 10 8" refX="9" refY="4" markerWidth="7" markerHeight="6" orient="auto"><path d="M0 0L10 4L0 8Z" fill="#0EA58A"/></marker>
     <style>
-      .title  { font-size: 32px; font-weight: 900; fill: #0F172A; letter-spacing: .3px; }
-      .subtitle { font-size: 13px; font-weight: 800; fill: #5B6678; letter-spacing: 1.4px; }
-      .section { font-size: 20px; font-weight: 900; fill: #111827; }
-      .sectionSub { font-size: 11.5px; font-weight: 800; fill: #667085; letter-spacing: .8px; }
-      .node   { font-size: 16px; font-weight: 900; fill: #111827; }
-      .nodeSub { font-size: 12.5px; font-weight: 750; fill: #596579; }
-      .body   { font-size: 14.5px; font-weight: 800; fill: #253041; }
-      .bodyS  { font-size: 13px; font-weight: 800; fill: #344054; }
-      .tiny   { font-size: 11.5px; font-weight: 750; fill: #687589; }
-      .blueFlow  { stroke: #3F7EE8; stroke-width: 2.4; fill: none; marker-end: url(#arrowBlue); }
-      .darkFlow  { stroke: #374151; stroke-width: 2.2; fill: none; marker-end: url(#arrowDark); }
-      .greenFlow { stroke: #239553; stroke-width: 2.4; fill: none; marker-end: url(#arrowGreen); }
-      .purpleFlow { stroke: #9656D5; stroke-width: 2.2; fill: none; marker-end: url(#arrowPurple); }
-      .redFlow   { stroke: #E05252; stroke-width: 2.2; fill: none; marker-end: url(#arrowRed); }
-      .tealFlow  { stroke: #0EA58A; stroke-width: 2.2; fill: none; marker-end: url(#arrowTeal); }
-      .dashFlow  { stroke: #5F8BE8; stroke-width: 2; fill: none; stroke-dasharray: 7 5; marker-end: url(#arrowBlue); }
-      .memDash   { stroke: #9656D5; stroke-width: 1.8; fill: none; stroke-dasharray: 5 5; marker-end: url(#arrowPurple); }
+      .ttl  { font-size:30px; font-weight:900; fill:#0F172A; letter-spacing:.3px }
+      .sub  { font-size:12px; font-weight:800; fill:#5B6678; letter-spacing:1.3px }
+      .sec  { font-size:18px; font-weight:900; fill:#111827 }
+      .ssub { font-size:10.5px; font-weight:800; fill:#667085; letter-spacing:.8px }
+      .nd   { font-size:15px; font-weight:900; fill:#111827 }
+      .ndsb { font-size:11.5px; font-weight:750; fill:#596579 }
+      .bd   { font-size:13.5px; font-weight:800; fill:#253041 }
+      .bds  { font-size:12px; font-weight:800; fill:#344054 }
+      .tn   { font-size:11px; font-weight:750; fill:#687589 }
+      /* flows */
+      .fBlue   { stroke:#3F7EE8; stroke-width:2.2; fill:none; marker-end:url(#aBlue) }
+      .fDark   { stroke:#374151; stroke-width:2.0; fill:none; marker-end:url(#aDark) }
+      .fGreen  { stroke:#239553; stroke-width:2.2; fill:none; marker-end:url(#aGreen) }
+      .fPurple { stroke:#9656D5; stroke-width:2.0; fill:none; marker-end:url(#aPurple) }
+      .fRed    { stroke:#E05252; stroke-width:2.0; fill:none; marker-end:url(#aRed) }
+      .fTeal   { stroke:#0EA58A; stroke-width:2.0; fill:none; marker-end:url(#aTeal) }
+      .fDash   { stroke:#5F8BE8; stroke-width:1.8; fill:none; stroke-dasharray:7 5; marker-end:url(#aBlue) }
+      .fMem    { stroke:#9656D5; stroke-width:1.6; fill:none; stroke-dasharray:5 5; marker-end:url(#aPurple) }
+      .fGray   { stroke:#A7B0BF; stroke-width:1.4; fill:none }
     </style>
   </defs>
 
+  <!-- Background -->
   <rect width="1200" height="800" fill="#FFFFFF"/>
-  <circle cx="600" cy="400" r="360" fill="url(#halo)"/>
+  <circle cx="600" cy="380" r="340" fill="url(#halo)"/>
 
-  <!-- Header -->
-  <text x="600" y="44" text-anchor="middle" class="title">K-Storm Architecture</text>
-  <text x="600" y="66" text-anchor="middle" class="subtitle">LOCAL-FIRST · 9-AGENT · MULTI-ROUND RESEARCH BRAINSTORMING</text>
-  <line x1="40" y1="88" x2="1160" y2="88" stroke="#E7ECF3" stroke-width="1.4"/>
+  <!-- ───────────────────── HEADER ───────────────────── -->
+  <text x="600" y="42" text-anchor="middle" class="ttl">K-Storm Architecture</text>
+  <text x="600" y="62" text-anchor="middle" class="sub">LOCAL-FIRST · 9-AGENT · MULTI-ROUND RESEARCH BRAINSTORMING</text>
+  <line x1="50" y1="82" x2="1150" y2="82" stroke="#E7ECF3" stroke-width="1.4"/>
 
-  <!-- ═══════════════════════════════════════════════════
-       LEFT — React Console
-  ═══════════════════════════════════════════════════ -->
-  <g filter="url(#shadow)">
-    <rect x="28" y="104" width="210" height="185" rx="16" fill="url(#blueSoft)" stroke="#8FB4EA" stroke-width="2"/>
-    <rect x="28" y="104" width="210" height="5" rx="3" fill="url(#barBlue)"/>
-    <text x="133" y="140" text-anchor="middle" class="section">Research Console</text>
-    <text x="133" y="157" text-anchor="middle" class="sectionSub">REACT 19 + VITE</text>
-    <!-- mini-mockup -->
-    <rect x="53" y="170" width="160" height="30" rx="6" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
-    <text x="133" y="190" text-anchor="middle" class="bodyS">Template + Docs</text>
-    <rect x="53" y="210" width="160" height="30" rx="6" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
-    <text x="133" y="230" text-anchor="middle" class="bodyS">Debate View / Report</text>
-    <rect x="53" y="250" width="160" height="28" rx="6" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
-    <text x="133" y="269" text-anchor="middle" class="bodyS">History + Memory Query</text>
+  <!-- ═══════════════════════════════════════════
+       LEFT COLUMN  x=145  w=210  cx=250
+       Top:104  Bot:640
+  ═══════════════════════════════════════════ -->
+
+  <!-- Console  y=104 h=200 → 304 -->
+  <g filter="url(#sh)">
+    <rect x="145" y="104" width="210" height="200" rx="16" fill="url(#gBlue)" stroke="#8FB4EA" stroke-width="2"/>
+    <rect x="145" y="104" width="210" height="5"   rx="3"  fill="url(#gBar)"/>
+    <text x="250" y="139" text-anchor="middle" class="sec">Research Console</text>
+    <text x="250" y="155" text-anchor="middle" class="ssub">REACT 19 + VITE</text>
+    <rect x="167" y="168" width="166" height="32" rx="7" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
+    <text x="250" y="189" text-anchor="middle" class="bds">Template + Docs</text>
+    <rect x="167" y="210" width="166" height="32" rx="7" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
+    <text x="250" y="231" text-anchor="middle" class="bds">Debate View / Report</text>
+    <rect x="167" y="252" width="166" height="32" rx="7" fill="#FFFFFF" stroke="#AFC8EF" stroke-width="1.4"/>
+    <text x="250" y="273" text-anchor="middle" class="bds">History + Memory Query</text>
   </g>
 
-  <!-- Providers -->
-  <g filter="url(#shadow)">
-    <rect x="28" y="320" width="210" height="130" rx="16" fill="url(#purpleSoft)" stroke="#D3C3F5" stroke-width="2"/>
-    <rect x="28" y="320" width="210" height="5" rx="3" fill="#9656D5"/>
-    <text x="133" y="357" text-anchor="middle" class="section">Providers</text>
-    <text x="133" y="388" text-anchor="middle" class="bodyS">OpenAI Compatible</text>
-    <text x="133" y="411" text-anchor="middle" class="bodyS">Anthropic Messages</text>
-    <text x="133" y="434" text-anchor="middle" class="bodyS">Local Mock</text>
+  <!-- Providers  y=320 h=142 → 462 -->
+  <g filter="url(#sh)">
+    <rect x="145" y="320" width="210" height="142" rx="16" fill="url(#gPurple)" stroke="#D3C3F5" stroke-width="2"/>
+    <rect x="145" y="320" width="210" height="5"   rx="3"  fill="#9656D5"/>
+    <text x="250" y="357" text-anchor="middle" class="sec">Providers</text>
+    <text x="250" y="390" text-anchor="middle" class="bds">OpenAI Compatible</text>
+    <text x="250" y="414" text-anchor="middle" class="bds">Anthropic Messages</text>
+    <text x="250" y="438" text-anchor="middle" class="bds">Local Mock</text>
   </g>
 
-  <!-- TF-IDF Memory -->
-  <g filter="url(#shadow)">
-    <rect x="28" y="480" width="210" height="115" rx="16" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="2"/>
-    <rect x="28" y="480" width="210" height="5" rx="3" fill="#9656D5"/>
-    <text x="133" y="516" text-anchor="middle" class="section">Memory Engine</text>
-    <text x="133" y="534" text-anchor="middle" class="sectionSub">TF-IDF · BIGRAM · COSINE</text>
-    <text x="133" y="557" text-anchor="middle" class="bodyS">directions · decisions</text>
-    <text x="133" y="577" text-anchor="middle" class="bodyS">claims · critiques · opps</text>
+  <!-- Memory Engine  y=478 h=162 → 640 -->
+  <g filter="url(#sh)">
+    <rect x="145" y="478" width="210" height="162" rx="16" fill="url(#gPurple)" stroke="#C68BE2" stroke-width="2"/>
+    <rect x="145" y="478" width="210" height="5"   rx="3"  fill="#9656D5"/>
+    <text x="250" y="514" text-anchor="middle" class="sec">Memory Engine</text>
+    <text x="250" y="531" text-anchor="middle" class="ssub">TF-IDF · BIGRAM · COSINE</text>
+    <text x="250" y="558" text-anchor="middle" class="bds">directions · decisions</text>
+    <text x="250" y="580" text-anchor="middle" class="bds">claims · critiques</text>
+    <text x="250" y="602" text-anchor="middle" class="bds">opportunities</text>
   </g>
 
-  <!-- ═══════════════════════════════════════════════════
-       CENTER TOP — Orchestration Core
-  ═══════════════════════════════════════════════════ -->
-  <g filter="url(#shadow)">
-    <rect x="275" y="104" width="420" height="148" rx="18" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2"/>
-    <rect x="275" y="104" width="420" height="5" rx="3" fill="url(#barBlue)"/>
-    <text x="485" y="140" text-anchor="middle" class="section">Orchestration Core</text>
-    <text x="485" y="157" text-anchor="middle" class="sectionSub">FASTAPI · STATE MACHINE · ROUTER</text>
+  <!-- ═══════════════════════════════════════════
+       CENTER COLUMN  x=385  w=420  cx=595
+       Top:104  Bot:640
+  ═══════════════════════════════════════════ -->
 
-    <rect x="296" y="172" width="118" height="46" rx="11" fill="url(#greenSoft)" stroke="#A8D79A" stroke-width="1.8"/>
-    <text x="355" y="193" text-anchor="middle" class="node">API</text>
-    <text x="355" y="211" text-anchor="middle" class="nodeSub">runs / history</text>
-
-    <rect x="426" y="172" width="118" height="46" rx="11" fill="url(#orangeSoft)" stroke="#F0B46D" stroke-width="1.8"/>
-    <text x="485" y="193" text-anchor="middle" class="node">Scheduler</text>
-    <text x="485" y="211" text-anchor="middle" class="nodeSub">state machine</text>
-
-    <rect x="556" y="172" width="118" height="46" rx="11" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="1.8"/>
-    <text x="615" y="193" text-anchor="middle" class="node">Router</text>
-    <text x="615" y="211" text-anchor="middle" class="nodeSub">model assign</text>
+  <!-- Orchestration Core  y=104 h=152 → 256 -->
+  <g filter="url(#sh)">
+    <rect x="385" y="104" width="420" height="152" rx="16" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2"/>
+    <rect x="385" y="104" width="420" height="5"   rx="3"  fill="url(#gBar)"/>
+    <text x="595" y="139" text-anchor="middle" class="sec">Orchestration Core</text>
+    <text x="595" y="155" text-anchor="middle" class="ssub">FASTAPI · STATE MACHINE · ROUTER</text>
+    <!-- 3 sub-boxes y=168 h=46 -->
+    <rect x="400" y="168" width="120" height="46" rx="10" fill="url(#gGreen)"  stroke="#A8D79A" stroke-width="1.7"/>
+    <text x="460" y="188" text-anchor="middle" class="nd">API</text>
+    <text x="460" y="206" text-anchor="middle" class="ndsb">runs / history</text>
+    <rect x="535" y="168" width="120" height="46" rx="10" fill="url(#gOrange)" stroke="#F0B46D" stroke-width="1.7"/>
+    <text x="595" y="188" text-anchor="middle" class="nd">Scheduler</text>
+    <text x="595" y="206" text-anchor="middle" class="ndsb">state machine</text>
+    <rect x="670" y="168" width="120" height="46" rx="10" fill="url(#gPurple)" stroke="#C68BE2" stroke-width="1.7"/>
+    <text x="730" y="188" text-anchor="middle" class="nd">Router</text>
+    <text x="730" y="206" text-anchor="middle" class="ndsb">model assign</text>
   </g>
 
-  <!-- ═══════════════════════════════════════════════════
-       CENTER MAIN — Agent Deliberation Ring
-  ═══════════════════════════════════════════════════ -->
-  <g filter="url(#shadow)">
-    <rect x="275" y="280" width="420" height="225" rx="18" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2"/>
-    <rect x="275" y="280" width="420" height="5" rx="3" fill="#F0B46D"/>
-    <text x="485" y="316" text-anchor="middle" class="section">Agent Deliberation Ring</text>
-    <text x="485" y="332" text-anchor="middle" class="sectionSub">PARALLEL ROUND 1 · SERIAL ROUND 2+ · IR</text>
+  <!-- Deliberation Ring  y=272 h=252 → 524 -->
+  <g filter="url(#sh)">
+    <rect x="385" y="272" width="420" height="252" rx="16" fill="#FFFFFF" stroke="#CDD5E1" stroke-width="2"/>
+    <rect x="385" y="272" width="420" height="5"   rx="3"  fill="#F0B46D"/>
+    <text x="595" y="307" text-anchor="middle" class="sec">Agent Deliberation Ring</text>
+    <text x="595" y="323" text-anchor="middle" class="ssub">PARALLEL R1 · SERIAL R2+ · PER-AGENT IR</text>
 
-    <!-- Debate Core circle -->
-    <circle cx="485" cy="415" r="48" fill="url(#coreGrad)" stroke="#F0B46D" stroke-width="2.2"/>
-    <circle cx="485" cy="415" r="32" fill="#FFFFFF" stroke="#F2CC8D" stroke-width="1.2"/>
-    <text x="485" y="411" text-anchor="middle" class="node">Debate</text>
-    <text x="485" y="429" text-anchor="middle" class="node">Core</text>
+    <!-- Debate Core circle  cx=595 cy=400 -->
+    <circle cx="595" cy="400" r="44" fill="url(#gCore)"  stroke="#F0B46D" stroke-width="2.2"/>
+    <circle cx="595" cy="400" r="30" fill="#FFFFFF"      stroke="#F2CC8D" stroke-width="1.2"/>
+    <text x="595" y="396" text-anchor="middle" class="nd">Debate</text>
+    <text x="595" y="414" text-anchor="middle" class="nd">Core</text>
 
     <!-- 4 debate agents -->
-    <rect x="290" y="360" width="126" height="50" rx="11" fill="url(#blueSoft)" stroke="#93B6EA" stroke-width="1.8"/>
-    <text x="353" y="381" text-anchor="middle" class="node">Novelty</text>
-    <text x="353" y="399" text-anchor="middle" class="nodeSub">directions</text>
+    <!-- Novelty top-left: x=400 y=338 w=120 h=46 cx=460 cy=361 -->
+    <rect x="400" y="338" width="120" height="46" rx="10" fill="url(#gBlue)"   stroke="#93B6EA" stroke-width="1.7"/>
+    <text x="460" y="358" text-anchor="middle" class="nd">Novelty</text>
+    <text x="460" y="376" text-anchor="middle" class="ndsb">directions</text>
+    <!-- Mechanism top-right: x=675 y=338 w=120 h=46 cx=735 cy=361 -->
+    <rect x="675" y="338" width="120" height="46" rx="10" fill="url(#gPurple)" stroke="#C68BE2" stroke-width="1.7"/>
+    <text x="735" y="358" text-anchor="middle" class="nd">Mechanism</text>
+    <text x="735" y="376" text-anchor="middle" class="ndsb">causal chain</text>
+    <!-- Feasibility bottom-left: x=400 y=430 w=120 h=46 cx=460 cy=453 -->
+    <rect x="400" y="430" width="120" height="46" rx="10" fill="url(#gGreen)"  stroke="#A8D79A" stroke-width="1.7"/>
+    <text x="460" y="450" text-anchor="middle" class="nd">Feasibility</text>
+    <text x="460" y="468" text-anchor="middle" class="ndsb">cost</text>
+    <!-- Reviewer bottom-right: x=675 y=430 w=120 h=46 cx=735 cy=453 -->
+    <rect x="675" y="430" width="120" height="46" rx="10" fill="url(#gOrange)" stroke="#F0B46D" stroke-width="1.7"/>
+    <text x="735" y="450" text-anchor="middle" class="nd">Reviewer</text>
+    <text x="735" y="468" text-anchor="middle" class="ndsb">risk</text>
 
-    <rect x="554" y="360" width="126" height="50" rx="11" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="1.8"/>
-    <text x="617" y="381" text-anchor="middle" class="node">Mechanism</text>
-    <text x="617" y="399" text-anchor="middle" class="nodeSub">causal chain</text>
-
-    <rect x="290" y="435" width="126" height="50" rx="11" fill="url(#greenSoft)" stroke="#A8D79A" stroke-width="1.8"/>
-    <text x="353" y="456" text-anchor="middle" class="node">Feasibility</text>
-    <text x="353" y="474" text-anchor="middle" class="nodeSub">cost</text>
-
-    <rect x="554" y="435" width="126" height="50" rx="11" fill="url(#orangeSoft)" stroke="#F0B46D" stroke-width="1.8"/>
-    <text x="617" y="456" text-anchor="middle" class="node">Reviewer</text>
-    <text x="617" y="474" text-anchor="middle" class="nodeSub">risk</text>
-
-    <!-- connector lines agents → core -->
-    <path d="M416 375C445 390 462 400 479 407" stroke="#CBD5E1" stroke-width="1.5" fill="none"/>
-    <path d="M554 375C526 390 509 400 493 407" stroke="#CBD5E1" stroke-width="1.5" fill="none"/>
-    <path d="M416 460C445 443 462 432 479 424" stroke="#CBD5E1" stroke-width="1.5" fill="none"/>
-    <path d="M554 460C526 443 509 432 493 424" stroke="#CBD5E1" stroke-width="1.5" fill="none"/>
+    <!-- connector lines: agents → core -->
+    <line x1="520" y1="361" x2="553" y2="387" class="fGray"/>
+    <line x1="675" y1="361" x2="638" y2="387" class="fGray"/>
+    <line x1="520" y1="453" x2="553" y2="415" class="fGray"/>
+    <line x1="675" y1="453" x2="638" y2="415" class="fGray"/>
   </g>
 
-  <!-- ═══════════════════════════════════════════════════
-       CENTER BOTTOM — Local Persistence
-  ═══════════════════════════════════════════════════ -->
-  <g filter="url(#shadow)">
-    <rect x="275" y="535" width="420" height="68" rx="16" fill="#F9FAFB" stroke="#D5DAE2" stroke-width="2"/>
-    <rect x="275" y="535" width="420" height="5" rx="3" fill="#239553"/>
-    <text x="485" y="569" text-anchor="middle" class="section">Local Persistence</text>
-    <text x="485" y="590" text-anchor="middle" class="bodyS">SQLite (WAL): runs · messages · IR · report · refs · memory</text>
+  <!-- Persistence  y=540 h=100 → 640 -->
+  <g filter="url(#sh)">
+    <rect x="385" y="540" width="420" height="100" rx="16" fill="#F9FAFB" stroke="#D5DAE2" stroke-width="2"/>
+    <rect x="385" y="540" width="420" height="5"   rx="3"  fill="#239553"/>
+    <text x="595" y="578" text-anchor="middle" class="sec">Local Persistence</text>
+    <text x="595" y="600" text-anchor="middle" class="bds">SQLite (WAL): runs · messages · IR · report · refs · memory</text>
   </g>
 
-  <!-- ═══════════════════════════════════════════════════
-       RIGHT — Pipeline
-  ═══════════════════════════════════════════════════ -->
-  <g filter="url(#shadow)">
-    <rect x="742" y="104" width="200" height="622" rx="18" fill="#FFF8FC" stroke="#D77BD5" stroke-width="2"/>
-    <rect x="742" y="104" width="200" height="5" rx="3" fill="#C85BD4"/>
-    <text x="842" y="140" text-anchor="middle" class="section">Pipeline</text>
-    <text x="842" y="157" text-anchor="middle" class="sectionSub">INTAKE → OUTPUT</text>
+  <!-- ═══════════════════════════════════════════
+       RIGHT COLUMN  x=835  w=220  cx=945
+       Top:104  Bot:640
+  ═══════════════════════════════════════════ -->
+  <g filter="url(#sh)">
+    <rect x="835" y="104" width="220" height="536" rx="16" fill="#FFF8FC" stroke="#D77BD5" stroke-width="2"/>
+    <rect x="835" y="104" width="220" height="5"   rx="3"  fill="#C85BD4"/>
+    <text x="945" y="139" text-anchor="middle" class="sec">Pipeline</text>
+    <text x="945" y="155" text-anchor="middle" class="ssub">INTAKE → OUTPUT</text>
 
-    <!-- 1: Intake Agent -->
-    <rect x="762" y="174" width="160" height="44" rx="10" fill="url(#blueSoft)" stroke="#93B6EA" stroke-width="1.8"/>
-    <text x="842" y="193" text-anchor="middle" class="body">Intake Agent</text>
-    <text x="842" y="211" text-anchor="middle" class="tiny">briefing synthesis</text>
-
-    <!-- 2: Moderator -->
-    <rect x="762" y="248" width="160" height="44" rx="10" fill="#FFFFFF" stroke="#374151" stroke-width="1.8"/>
-    <text x="842" y="267" text-anchor="middle" class="body">Moderator</text>
-    <text x="842" y="285" text-anchor="middle" class="tiny">conflict / next-round agenda</text>
-
-    <!-- 3: Critique Agent -->
-    <rect x="762" y="322" width="160" height="44" rx="10" fill="url(#redSoft)" stroke="#E05252" stroke-width="1.8"/>
-    <text x="842" y="341" text-anchor="middle" class="body">Critique Agent</text>
-    <text x="842" y="359" text-anchor="middle" class="tiny">6-dimension risk report</text>
-
-    <!-- 4: Group Summarizer -->
-    <rect x="762" y="396" width="160" height="44" rx="10" fill="url(#orangeSoft)" stroke="#F0B46D" stroke-width="1.8"/>
-    <text x="842" y="415" text-anchor="middle" class="body">Group Summarizer</text>
-    <text x="842" y="433" text-anchor="middle" class="tiny">StructuredIRV2</text>
-
-    <!-- 5: Citation Review Agent -->
-    <rect x="762" y="470" width="160" height="44" rx="10" fill="url(#tealSoft)" stroke="#0EA58A" stroke-width="1.8"/>
-    <text x="842" y="489" text-anchor="middle" class="body">Citation Review</text>
-    <text x="842" y="507" text-anchor="middle" class="tiny">A/B/C/D quality rating</text>
-
-    <!-- 6: Output Agent -->
-    <rect x="762" y="544" width="160" height="44" rx="10" fill="url(#purpleSoft)" stroke="#C68BE2" stroke-width="1.8"/>
-    <text x="842" y="563" text-anchor="middle" class="body">Output Agent</text>
-    <text x="842" y="581" text-anchor="middle" class="tiny">final report synthesis</text>
-
-    <!-- 7: Markdown Report -->
-    <rect x="762" y="618" width="160" height="44" rx="10" fill="#FFFFFF" stroke="#374151" stroke-width="1.8"/>
-    <text x="842" y="643" text-anchor="middle" class="node">Markdown Report</text>
-
-    <!-- pipeline arrows -->
-    <line x1="842" y1="218" x2="842" y2="248" class="blueFlow"/>
-    <line x1="842" y1="292" x2="842" y2="322" class="darkFlow"/>
-    <line x1="842" y1="366" x2="842" y2="396" class="redFlow"/>
-    <line x1="842" y1="440" x2="842" y2="470" class="tealFlow"/>
-    <line x1="842" y1="514" x2="842" y2="544" class="purpleFlow"/>
-    <line x1="842" y1="588" x2="842" y2="618" class="purpleFlow"/>
+    <!-- Stage boxes: x=852 w=186 cx=945 -->
+    <!-- 1 Intake Agent  y=172 h=46 → 218 -->
+    <rect x="852" y="172" width="186" height="46" rx="9" fill="url(#gBlue)"   stroke="#93B6EA" stroke-width="1.8"/>
+    <text x="945" y="191" text-anchor="middle" class="bd">Intake Agent</text>
+    <text x="945" y="209" text-anchor="middle" class="tn">briefing synthesis</text>
+    <!-- arrow y=218→232 -->
+    <line x1="945" y1="218" x2="945" y2="232" class="fBlue"/>
+    <!-- 2 Moderator  y=232 h=46 → 278 -->
+    <rect x="852" y="232" width="186" height="46" rx="9" fill="#FFFFFF"       stroke="#374151" stroke-width="1.8"/>
+    <text x="945" y="251" text-anchor="middle" class="bd">Moderator</text>
+    <text x="945" y="269" text-anchor="middle" class="tn">conflict / next-round agenda</text>
+    <!-- arrow y=278→292 -->
+    <line x1="945" y1="278" x2="945" y2="292" class="fDark"/>
+    <!-- 3 Critique Agent  y=292 h=46 → 338 -->
+    <rect x="852" y="292" width="186" height="46" rx="9" fill="url(#gRed)"    stroke="#E05252" stroke-width="1.8"/>
+    <text x="945" y="311" text-anchor="middle" class="bd">Critique Agent</text>
+    <text x="945" y="329" text-anchor="middle" class="tn">6-dimension risk report</text>
+    <!-- arrow y=338→352 -->
+    <line x1="945" y1="338" x2="945" y2="352" class="fRed"/>
+    <!-- 4 Group Summarizer  y=352 h=46 → 398 -->
+    <rect x="852" y="352" width="186" height="46" rx="9" fill="url(#gOrange)" stroke="#F0B46D" stroke-width="1.8"/>
+    <text x="945" y="371" text-anchor="middle" class="bd">Group Summarizer</text>
+    <text x="945" y="389" text-anchor="middle" class="tn">StructuredIRV2</text>
+    <!-- arrow y=398→412 -->
+    <line x1="945" y1="398" x2="945" y2="412" class="fTeal"/>
+    <!-- 5 Citation Review  y=412 h=46 → 458 -->
+    <rect x="852" y="412" width="186" height="46" rx="9" fill="url(#gTeal)"   stroke="#0EA58A" stroke-width="1.8"/>
+    <text x="945" y="431" text-anchor="middle" class="bd">Citation Review</text>
+    <text x="945" y="449" text-anchor="middle" class="tn">A/B/C/D quality rating</text>
+    <!-- arrow y=458→472 -->
+    <line x1="945" y1="458" x2="945" y2="472" class="fPurple"/>
+    <!-- 6 Output Agent  y=472 h=46 → 518 -->
+    <rect x="852" y="472" width="186" height="46" rx="9" fill="url(#gPurple)" stroke="#C68BE2" stroke-width="1.8"/>
+    <text x="945" y="491" text-anchor="middle" class="bd">Output Agent</text>
+    <text x="945" y="509" text-anchor="middle" class="tn">final report synthesis</text>
+    <!-- arrow y=518→532 -->
+    <line x1="945" y1="518" x2="945" y2="532" class="fPurple"/>
+    <!-- 7 Markdown Report  y=532 h=46 → 578 -->
+    <rect x="852" y="532" width="186" height="46" rx="9" fill="#FFFFFF"       stroke="#374151" stroke-width="1.8"/>
+    <text x="945" y="558" text-anchor="middle" class="nd">Markdown Report</text>
   </g>
 
-  <!-- ═══════════════════════════════════════════════════
-       CONNECTING ARROWS
-  ═══════════════════════════════════════════════════ -->
-  <!-- Console → Core (input) -->
-  <path d="M238 196H275" class="blueFlow"/>
-  <rect x="243" y="182" width="26" height="18" rx="5" fill="#FFFFFF" opacity=".95"/>
-  <text x="256" y="195" text-anchor="middle" class="tiny">input</text>
+  <!-- ═══════════════════════════════════════════
+       INTER-COLUMN ARROWS
+  ═══════════════════════════════════════════ -->
 
-  <!-- Core → Deliberation Ring -->
-  <path d="M485 252V280" class="darkFlow"/>
+  <!-- Console → Orchestration (input) -->
+  <path d="M355 204H385" class="fBlue"/>
+  <rect x="358" y="192" width="24" height="16" rx="4" fill="#FFFFFF" opacity=".95"/>
+  <text x="370" y="204" text-anchor="middle" class="tn">in</text>
+
+  <!-- Orchestration → Deliberation Ring -->
+  <path d="M595 256V272" class="fDark"/>
 
   <!-- Deliberation Ring → Pipeline (IR out) -->
-  <path d="M695 415H742" class="blueFlow"/>
-  <rect x="700" y="401" width="22" height="18" rx="5" fill="#FFFFFF" opacity=".95"/>
-  <text x="711" y="414" text-anchor="middle" class="tiny">IR</text>
+  <path d="M805 400H835" class="fBlue"/>
+  <rect x="808" y="388" width="20" height="16" rx="4" fill="#FFFFFF" opacity=".95"/>
+  <text x="818" y="400" text-anchor="middle" class="tn">IR</text>
 
-  <!-- Deliberation Ring → Persistence (persist) -->
-  <path d="M485 505V535" class="greenFlow"/>
-  <rect x="494" y="510" width="38" height="18" rx="5" fill="#FFFFFF" opacity=".95"/>
-  <text x="513" y="523" text-anchor="middle" class="tiny">persist</text>
+  <!-- Deliberation Ring → Persistence -->
+  <path d="M595 524V540" class="fGreen"/>
+  <rect x="577" y="527" width="36" height="16" rx="4" fill="#FFFFFF" opacity=".95"/>
+  <text x="595" y="539" text-anchor="middle" class="tn">persist</text>
 
-  <!-- Console → Persistence (read) -->
-  <path d="M238 340Q260 340 275 570" stroke="#CBD5E1" stroke-width="2" fill="none" marker-end="url(#arrowDark)"/>
+  <!-- Providers → Orchestration (model calls, dashed purple) -->
+  <path d="M250 320Q250 230 385 185" stroke="#9656D5" stroke-width="1.8" fill="none" stroke-dasharray="6 5" marker-end="url(#aPurple)"/>
 
-  <!-- Providers → Core (model calls) -->
-  <path d="M238 385Q260 385 275 230" stroke="#9656D5" stroke-width="2" fill="none" stroke-dasharray="6 4" marker-end="url(#arrowPurple)"/>
+  <!-- Console → Persistence (read history, dashed gray) -->
+  <path d="M355 290Q375 590 385 590" stroke="#A7B0BF" stroke-width="1.6" fill="none" stroke-dasharray="5 4" marker-end="url(#aDark)"/>
 
-  <!-- Memory Engine → Pipeline (cross-run search) -->
-  <path d="M238 540Q260 540 742 440" class="memDash"/>
-  <rect x="440" y="520" width="96" height="18" rx="5" fill="#FFFFFF" opacity=".95"/>
-  <text x="488" y="533" text-anchor="middle" class="tiny">cross-run search</text>
+  <!-- Memory → Pipeline (cross-run search, dashed purple) -->
+  <path d="M355 559Q590 559 835 435" class="fMem"/>
+  <rect x="545" y="547" width="100" height="16" rx="4" fill="#FFFFFF" opacity=".95"/>
+  <text x="595" y="559" text-anchor="middle" class="tn">cross-run search</text>
 
-  <!-- Pipeline → Persistence (IR / report write) -->
-  <path d="M742 590H760" stroke="none"/>
-  <path d="M742 470Q720 470 695 570" stroke="#0EA58A" stroke-width="1.8" fill="none" stroke-dasharray="6 4" marker-end="url(#arrowTeal)"/>
-
-  <!-- Footer -->
-  <text x="600" y="775" text-anchor="middle" class="tiny">K-Storm v2.0 · Local-first research brainstorming · MIT License</text>
+  <!-- ───────────────────── FOOTER ───────────────────── -->
+  <text x="600" y="775" text-anchor="middle" class="tn">K-Storm v2.0 · Local-first research brainstorming · MIT License</text>
 </svg>
