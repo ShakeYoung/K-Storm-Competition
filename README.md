@@ -83,15 +83,25 @@ The detected stage is injected into every agent prompt as a **stage label + stag
 - 🌊 **SSE token streaming** — dual-channel SSE: run-state channel (800ms snapshot) + token-stream channel (100ms buffer); phantom card transitions seamlessly to confirmed message
 - 🔍 **Critique Agent** — independent structured critique phase after all debate rounds; covers 6 risk dimensions (novelty / evidence chain / feasibility / consistency / bias / next-step risk)
 - 📚 **Citation Review Agent** — cross-validates all cited references for relevance, completeness, consistency and density; produces A/B/C/D citation quality rating
+- 🧠 **TF-IDF cross-run memory search** — extracts 5-type MemoryEntries (directions / decisions / claims / critiques / opportunities) from all completed runs' StructuredIRV2; pure stdlib bigram TF-IDF cosine retrieval with type and field filters; accessible via the "跨 Run 知识检索" tab in Memory Query mode
 
 ## 🏗️ Architecture
 
-K-Storm is organized as a local research orchestration system: the React console handles input, debate visualization, reports, and history; the FastAPI backend runs the state machine and routes each agent slot to its assigned model. The deliberation group consists of four complementary roles:
+K-Storm is organized as a local research orchestration system: the React console handles input, debate visualization, reports, and history; the FastAPI backend runs the state machine and routes each agent slot to its assigned model. Nine specialized agents collaborate across the pipeline:
 
+**Debate group** (each independently bound to a model)
 - **Novelty Agent** — proposes new directions and differentiating angles
 - **Mechanism Agent** — examines causal chains and mechanism plausibility
 - **Feasibility Agent** — evaluates experiment design, resources, and execution cost
 - **Reviewer Agent** — simulates peer-review criticism and exposes weak points
+
+**Orchestration & synthesis**
+- **Intake Agent** — condenses template + uploaded documents into a structured briefing
+- **Moderator** — after round 1, summarizes conflicts, omissions, and the agenda for round 2+
+- **Critique Agent** — after all debate rounds, produces an independent 6-dimension risk report
+- **Group Summarizer** — compresses per-agent IR summaries into a structured StructuredIRV2 decision record
+- **Citation Review Agent** — cross-validates all cited references for credibility; outputs A/B/C/D rating
+- **Output Agent** — synthesizes briefing + IR + debate into the final Markdown report
 
 <div align="center">
 <img src="assets/k-storm-architecture.svg" alt="K-Storm Architecture" width="1400">

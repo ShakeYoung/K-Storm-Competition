@@ -92,15 +92,25 @@ K-Storm 根据模板信息密度自动判断当前所处的科研周期阶段，
 - 🌊 **SSE 逐字流式输出** — 双通道 SSE：运行状态通道（800ms 快照）+ token 流通道（100ms 缓冲刷新）；phantom 卡片无缝过渡为确认消息
 - 🔍 **Critique Agent** — 所有辩论轮次结束后独立执行批判审查，覆盖创新性风险 / 证据链完整性 / 可行性盲点 / 逻辑一致性 / 偏见盲区 / 下一步风险 六个维度
 - 📚 **Citation Review Agent** — 对所有 Agent 引用的外部文献进行语义真实性交叉验证，输出引用质量 A/B/C/D 评级
+- 🧠 **TF-IDF 跨 Run 记忆检索** — 从所有已完成 Run 的 StructuredIRV2 中提取 5 类 MemoryEntry（候选方向 / 决策摘要 / 关键主张 / 批判点 / 机会点），纯 Python stdlib 字符 bigram + 余弦相似度检索，支持类型与研究领域过滤；在记忆查询模式的「跨 Run 知识检索」Tab 中使用
 
 ## 🏗️ 系统架构
 
-K-Storm 的核心是一个本地运行的研究编排系统：React 控制台负责输入、讨论可视化与报告呈现，FastAPI 后端维护运行状态机，并按 Agent 位置路由到不同模型。讨论组由四个互补角色构成：
+K-Storm 的核心是一个本地运行的研究编排系统：React 控制台负责输入、讨论可视化与报告呈现，FastAPI 后端维护运行状态机，并按 Agent 位置路由到不同模型。系统共有 9 个专职 Agent，协同完成从输入整合到最终报告的全流程：
 
+**讨论组**（每个 Agent 可独立绑定不同模型）
 - **Novelty Agent**：提出新方向与差异化切入点
 - **Mechanism Agent**：检查机制链条与因果解释
 - **Feasibility Agent**：评估实验资源、成本和可执行性
 - **Reviewer Agent**：模拟审稿质疑，暴露风险与薄弱环节
+
+**编排与综合层**
+- **Intake Agent**：整合模板与上传文档，输出高密度结构化 Briefing
+- **Moderator**：第 1 轮结束后汇总冲突点、遗漏点，生成第 2 轮讨论议程
+- **Critique Agent**：所有辩论轮次结束后，独立产出六维风险评估报告
+- **Group Summarizer**：将各 Agent IR 摘要压缩为 StructuredIRV2 决策结构体
+- **Citation Review Agent**：对全部引用进行语义交叉校验，输出 A/B/C/D 引用质量评级
+- **Output Agent**：综合 Briefing + IR + 讨论记录，生成最终 Markdown 报告
 
 <div align="center">
 <img src="assets/k-storm-architecture.svg" alt="K-Storm Architecture" width="1400">
