@@ -147,6 +147,7 @@ backend/
     orchestrator/        Run execution state machine
     schemas/             Pydantic models
     storage/             SQLite database layer
+    memory/              TF-IDF cross-run memory retrieval engine
     main.py              FastAPI app entry point
 frontend/
   public/
@@ -250,6 +251,7 @@ POST   /api/runs/{run_id}/resume          Resume a failed/canceled run
 POST   /api/runs/{run_id}/cancel          Cancel a running run
 POST   /api/runs/{run_id}/references      Extract or update external references
 POST   /api/memory/query                  Memory query against a completed run
+POST   /api/memory/search                 TF-IDF cross-run knowledge search
 GET    /api/history                       List past runs
 POST   /api/history/delete                Delete selected runs
 POST   /api/models/discover               Discover available models from a provider

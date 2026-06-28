@@ -158,6 +158,7 @@ backend/
     orchestrator/        运行执行状态机
     schemas/             Pydantic 模型
     storage/             SQLite 数据层
+    memory/              TF-IDF 跨 Run 记忆检索引擎
     main.py              FastAPI 入口
 frontend/
   public/
@@ -261,6 +262,7 @@ POST   /api/runs/{run_id}/resume          从失败位置继续
 POST   /api/runs/{run_id}/cancel          停止运行
 POST   /api/runs/{run_id}/references      提取或更新外部论据
 POST   /api/memory/query                  记忆查询（基于已完成 Run）
+POST   /api/memory/search                 TF-IDF 跨 Run 知识检索
 GET    /api/history                       历史记录列表
 POST   /api/history/delete                删除历史记录
 POST   /api/models/discover               从供应商发现可用模型
