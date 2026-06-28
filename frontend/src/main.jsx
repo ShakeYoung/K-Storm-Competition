@@ -1933,6 +1933,92 @@ function DebatePage({ run, loading, activeRounds, onRerun, onCancel, onConfirmRe
   );
 }
 
+/* ── Perspective Coverage ── */
+const PERSPECTIVES = [
+  { key: "mechanism", label: "机制原理", keywords: ["机制", "原理", "理论", "框架", "作用", "假说", "pathway", "mechanism"] },
+  { key: "data",      label: "数据实验", keywords: ["数据", "实验", "样本", "测量", "观测", "实证", "验证", "数据集", "采集", "dataset"] },
+  { key: "method",    label: "技术方法", keywords: ["方法", "算法", "技术", "路线", "方案", "流程", "策略", "工具", "method", "approach"] },
+  { key: "resource",  label: "资源条件", keywords: ["资源", "设备", "条件", "经费", "成本", "计算", "硬件", "人力", "基础设施"] },
+  { key: "risk",      label: "风险挑战", keywords: ["风险", "挑战", "困难", "局限", "不足", "缺陷", "瓶颈", "障碍", "限制", "limitation"] },
+  { key: "transfer",  label: "应用转化", keywords: ["转化", "应用", "落地", "产品", "商业", "推广", "临床", "实用", "影响", "价值"] },
+];
+
+function PerspectiveCoverage({ run }) {
+  const coverage = React.useMemo(() => {
+    if (!run) return {};
+    const corpus = [
+      run.group_summary  || "",
+      run.final_report   || "",
+      run.structured_brief || "",
+      ...(run.debate_messages || []).map((m) => m.content || ""),
+    ].join(" ").toLowerCase();
+    return Object.fromEntries(
+      PERSPECTIVES.map((p) => [p.key, p.keywords.some((kw) => corpus.includes(kw.toLowerCase()))])
+    );
+  }, [run]);
+
+  const coveredN = Object.values(coverage).filter(Boolean).length;
+  const total    = PERSPECTIVES.length;
+  const pct      = Math.round((coveredN / total) * 100);
+  const allDone  = coveredN === total;
+
+  if (!run) return null;
+
+  return (
+    <div className="intel-card">
+      <h3 style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>视角覆盖</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: allDone ? "#1A7A5E" : "var(--accent)" }}>
+          {coveredN}/{total}
+        </span>
+      </h3>
+
+      {/* Progress bar */}
+      <div style={{ height: 4, background: "var(--border)", borderRadius: 2, overflow: "hidden", margin: "8px 0 10px" }}>
+        <div style={{
+          width: `${pct}%`, height: "100%", borderRadius: 2,
+          background: allDone ? "#1A7A5E" : "var(--accent)",
+          transition: "width 0.6s cubic-bezier(.4,0,.2,1)",
+        }} />
+      </div>
+
+      {/* Perspective rows */}
+      <div style={{ display: "grid", gap: 6 }}>
+        {PERSPECTIVES.map((p) => {
+          const on = coverage[p.key];
+          return (
+            <div key={p.key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                background: on ? "#1A7A5E" : "transparent",
+                border: `1.5px solid ${on ? "#1A7A5E" : "var(--muted)"}`,
+                boxShadow: on ? "0 0 0 2px rgba(26,122,94,0.14)" : "none",
+              }} />
+              <span style={{ fontSize: 12, fontWeight: on ? 600 : 400, color: on ? "var(--ink-soft)" : "var(--muted)" }}>
+                {p.label}
+              </span>
+              {!on && (
+                <span style={{ fontSize: 10, color: "var(--muted)", marginLeft: "auto", opacity: 0.7 }}>未覆盖</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {coveredN > 0 && !allDone && (
+        <div style={{ marginTop: 8, fontSize: 10, color: "var(--muted)", lineHeight: 1.5, borderTop: "1px solid var(--border)", paddingTop: 7 }}>
+          未覆盖视角可在下一轮讨论中补充
+        </div>
+      )}
+      {allDone && (
+        <div style={{ marginTop: 8, fontSize: 10, color: "#1A7A5E", fontWeight: 600, borderTop: "1px solid var(--border)", paddingTop: 7 }}>
+          ✓ 全部视角已覆盖
+        </div>
+      )}
+    </div>
+  );
+}
+
 function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy, onDownloadReport, onDownloadJson, onDownloadBundle, onExportPDF }) {
   const brief = run?.structured_brief;
   const assignments = modelSettings.assignments || {};
@@ -1983,6 +2069,8 @@ function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy
           ) : null}
         </div>
       </div>
+
+      <PerspectiveCoverage run={run} />
 
       {assignmentEntries.length > 0 ? (
         <div className="intel-card">
