@@ -92,6 +92,12 @@ class OpenAICompatibleClient:
 
         try:
             with urllib.request.urlopen(request, timeout=300, context=ctx) as response:
+                # Set a per-read socket timeout so stalled streams (TCP alive
+                # but no data) are detected and don't block indefinitely.
+                try:
+                    response.fp.raw._sock.settimeout(60)
+                except AttributeError:
+                    pass
                 buf = b""
                 while True:
                     chunk = response.read(4096)

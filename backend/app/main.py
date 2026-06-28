@@ -3,9 +3,12 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 import json
+import logging
 import ssl
 import urllib.error
 import urllib.request
+
+logger = logging.getLogger(__name__)
 
 from fastapi import BackgroundTasks, Body, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -177,6 +180,7 @@ def index() -> FileResponse:
 def create_run(payload: RunCreate, background_tasks: BackgroundTasks) -> RunRecord:
     provider = get_model_provider(payload.model_settings)
     run = create_run_record(payload)
+    logger.info("created run %s mode=%s provider=%s", run.run_id, payload.mode, provider.__class__.__name__)
     if payload.mode.value != "memory" or payload.source_run_id:
         background_tasks.add_task(
             execute_run_safe,

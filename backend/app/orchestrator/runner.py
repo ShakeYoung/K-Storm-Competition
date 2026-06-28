@@ -3,9 +3,12 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 import json
+import logging
 import re
 import threading
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 from app.agents.registry import (
     CITATION_REVIEW_AGENT,
@@ -239,6 +242,7 @@ def generate_validated(
         is_truncation = len(body) >= truncation_threshold
 
         if is_truncation and attempt < attempts - 1:
+            logger.warning("generate_validated retry (truncation) agent=%s kind=%s attempt=%d errors=%s", agent_key, kind, attempt, last_errors)
             # Truncation: save body, ask for continuation only
             last_body = body
             is_continuation = True
@@ -261,6 +265,7 @@ def generate_validated(
 --- 请从这里续写 ---
 补全所有缺失小节,最后必须以 {marker} 结束。"""
         elif attempt < attempts - 1:
+            logger.warning("generate_validated retry (empty/short) agent=%s kind=%s attempt=%d errors=%s", agent_key, kind, attempt, last_errors)
             # Empty/very short output: full retry with correction hints
             prompt = f"""你上一条输出没有通过完整性校验,问题如下:
 {chr(10).join('- ' + item for item in last_errors)}
@@ -442,6 +447,7 @@ def execute_run_safe(
     probe_agent: str = "",
     probe_question: str = "",
 ) -> None:
+    logger.info("run %s started mode=%s rounds=%d", run.run_id, mode, rounds)
     try:
         if mode == DiscussionMode.FOCUSED_PANEL or mode == DiscussionMode.MEMORY_QUERY:
             execute_focused_panel(run, rounds, provider, documents or [], selected_agents or [])
@@ -449,9 +455,12 @@ def execute_run_safe(
             execute_quick_probe(run, provider, documents or [], probe_agent, probe_question)
         else:
             execute_run(run, rounds, provider, documents or [], parallel_first_round)
+        logger.info("run %s completed", run.run_id)
     except RunCanceled:
+        logger.info("run %s canceled", run.run_id)
         return
     except Exception as exc:
+        logger.exception("run %s failed: %s", run.run_id, exc)
         failed_run = db.get_run(run.run_id)
         if failed_run.status == RunStatus.CANCELED:
             return
@@ -466,6 +475,7 @@ def execute_run_safe(
     finally:
         # run 进入终态后从取消集合中清除，防止集合无限增长
         _CANCELED_RUNS.discard(run.run_id)
+        clear_stream_buffer(run.run_id)
 
 
 def execute_focused_panel(
@@ -849,9 +859,6 @@ def cancel_run(run_id: str) -> RunRecord:
 
 def ensure_not_canceled(run_id: str) -> None:
     if run_id in _CANCELED_RUNS:
-        raise RunCanceled(run_id)
-    if db.get_run(run_id).status == RunStatus.CANCELED:
-        _CANCELED_RUNS.add(run_id)
         raise RunCanceled(run_id)
 
 
@@ -3041,10 +3048,8 @@ def _fallback_extract(messages, add_fn):
         # 2. 提取 arXiv ID
         for match in arxiv_pattern.finditer(content):
             arxiv_id = match.group(1)
-            # 检查是否已被 URL 提取覆盖
+            # 检查是否已被 URL 提取覆盖（add_fn 内部通过 existing_urls 去重）
             arxiv_url = f"https://arxiv.org/abs/{arxiv_id}"
-            if any(r.url == arxiv_url for r in refs if hasattr(add_fn, '__self__')):
-                continue
             # 提取上下文
             start = max(0, match.start() - 100)
             end = min(len(content), match.end() + 60)
@@ -3215,10 +3220,14 @@ def clean_final_report(report: str) -> str:
         r"(如果你愿意|我下一步可以|下一步可以继续|可以继续把|PPT式|PPT 式|组会\s*10\s*分钟|基金版本|基金申请书|继续整理成)",
         re.IGNORECASE,
     )
-    for line in lines:
-        if forbidden.search(line):
+    # 从末尾向上扫描，截去尾部所有匹配行，保留中间匹配行（正文一部分）
+    cutoff = len(lines)
+    for i in range(len(lines) - 1, -1, -1):
+        if forbidden.search(lines[i]):
+            cutoff = i
+        else:
             break
-        cleaned.append(line)
+    cleaned = lines[:cutoff]
     return "\n".join(cleaned).strip()
 
 
