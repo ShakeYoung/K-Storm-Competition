@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.model_providers.factory import get_model_provider
 from app.orchestrator.runner import cancel_run, create_run_record, execute_memory_query, execute_run_safe, get_stream_state, rerun, resume_run_safe
 from app.schemas.models import (
+    DiscussionMode,
     HistoryDeleteRequest,
     HistoryItem,
     MemoryQueryRequest,
@@ -24,6 +25,7 @@ from app.schemas.models import (
     RunCreate,
     RunRecord,
     RunResumeRequest,
+    UpgradeRequest,
     UserModelProvider,
 )
 from app.storage import db
@@ -307,6 +309,52 @@ def rerun_run(run_id: str) -> RunRecord:
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Run not found") from exc
     return rerun(source, get_model_provider(source.model_settings))
+
+
+@app.post("/api/runs/{run_id}/upgrade", response_model=RunRecord)
+def upgrade_run(run_id: str, payload: UpgradeRequest, background_tasks: BackgroundTasks) -> RunRecord:
+    """将已完成的 Quick Probe / Focused Panel 升级为更完整的讨论模式，历史上下文自动携带。"""
+    try:
+        source = db.get_run(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    if source.status != "COMPLETED":
+        raise HTTPException(status_code=400, detail="只有已完成的运行可以升级")
+    valid_upgrades: dict[str, list[DiscussionMode]] = {
+        "quick":   [DiscussionMode.FOCUSED_PANEL, DiscussionMode.FULL_DELIBERATION],
+        "focused": [DiscussionMode.FULL_DELIBERATION],
+    }
+    if payload.target_mode not in valid_upgrades.get(source.mode, []):
+        raise HTTPException(status_code=400, detail=f"不支持从 {source.mode} 升级到 {payload.target_mode}")
+    model_settings = payload.model_settings or source.model_settings
+    src_name = source.run_name or source.run_id[:8]
+    mode_label = {"focused": "聚焦研讨", "full": "完整讨论"}.get(payload.target_mode, payload.target_mode)
+    new_payload = RunCreate(
+        template_input=source.template_input,
+        documents=source.documents,
+        mode=payload.target_mode,
+        rounds=payload.rounds,
+        parallel_first_round=False,
+        selected_agents=payload.selected_agents,
+        model_settings=model_settings,
+        upgrade_from_run_id=run_id,
+        run_name=f"[升级→{mode_label}] {src_name}",
+    )
+    provider = get_model_provider(model_settings)
+    run = create_run_record(new_payload)
+    background_tasks.add_task(
+        execute_run_safe,
+        run,
+        payload.rounds,
+        provider,
+        source.documents,
+        False,
+        payload.target_mode,
+        payload.selected_agents,
+        "",
+        "",
+    )
+    return run
 
 
 @app.post("/api/runs/{run_id}/cancel", response_model=RunRecord)

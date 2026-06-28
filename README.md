@@ -35,6 +35,8 @@ K-Storm is a **fully local** research topic brainstorming workbench. Multiple AI
 | **Quick Probe** | 1 | 1 | Fast sanity check on one question |
 | **Memory Query** | Select agents | 1–5 | Continue from a historical run's context |
 
+Modes form an **upgrade chain**: Quick Probe → Focused Panel → Full Deliberation. After any completed lightweight run, a one-click **Upgrade** button appears — the new run automatically inherits the prior run's brief, findings, IR, and critique as injected context, so agents build on what was already discovered rather than starting cold.
+
 ## 🧭 Research Stages
 
 K-Storm automatically detects which phase of the research cycle you're in based on the information density in your template, and adjusts all agent output focus accordingly. You can also override the detection manually.
@@ -251,6 +253,7 @@ POST   /api/runs/{run_id}/resume          Resume a failed/canceled run
 POST   /api/runs/{run_id}/cancel          Cancel a running run
 POST   /api/runs/{run_id}/references      Extract or update external references
 POST   /api/memory/query                  Memory query against a completed run
+POST   /api/runs/{run_id}/upgrade          Upgrade to a higher mode, carrying over context
 POST   /api/memory/search                 TF-IDF cross-run knowledge search
 GET    /api/history                       List past runs
 POST   /api/history/delete                Delete selected runs

@@ -43,6 +43,51 @@ _STREAM_META: dict[str, dict] = {}        # run_id → {agent, step_type, round}
 _STREAM_LOCK = threading.Lock()
 
 
+def inject_upgrade_context(run: RunRecord, structured_brief: StructuredBrief) -> None:
+    """升级链路：将 upgrade_from_run_id 指向的历史 Run 的关键发现注入到当前 brief 中。
+    Quick Probe → 注入探测问题和回答；Focused/Full → 另注入 IR 摘要和 Critique。
+    直接修改 structured_brief.intake_synthesis（原地更新，无返回值）。
+    """
+    if not run.upgrade_from_run_id:
+        return
+    try:
+        src = db.get_run(run.upgrade_from_run_id)
+    except Exception:
+        return
+
+    parts: list[str] = [f"\n\n## 升级上下文（来自 {src.mode} 探索：{src.template_input.field}）\n"]
+
+    # Quick Probe 结果
+    if src.mode == DiscussionMode.QUICK_PROBE and src.debate_messages:
+        msg = src.debate_messages[0]
+        parts.append(f"**快速探测问题**：{src.probe_question or src.template_input.core_question}")
+        parts.append(f"**探测结论**：\n{msg.content[:1200]}")
+
+    # Focused Panel 结果
+    if src.mode == DiscussionMode.FOCUSED_PANEL:
+        if src.debate_messages:
+            samples = [
+                f"[{m.agent}·R{m.round}] {m.content[:400]}"
+                for m in src.debate_messages[:6]
+            ]
+            parts.append("**聚焦研讨摘要**：\n" + "\n".join(samples))
+        if src.group_summary:
+            parts.append(f"**结构化 IR 摘要**：\n{src.group_summary[:1200]}")
+        if src.critique_report:
+            parts.append(f"**独立批判审查**：\n{src.critique_report[:600]}")
+
+    # 通用：源 run 的 StructuredIR 候选方向
+    if src.structured_ir and src.structured_ir.candidate_directions:
+        dirs = [
+            f"- {d.title}：{d.research_question}"
+            for d in src.structured_ir.candidate_directions[:4]
+        ]
+        parts.append("**前序分析候选方向**：\n" + "\n".join(dirs))
+
+    if len(parts) > 1:  # 有实质内容才追加
+        structured_brief.intake_synthesis += "\n".join(parts)
+
+
 def set_stream_buffer(run_id: str, text: str, meta: dict | None = None) -> None:
     with _STREAM_LOCK:
         _STREAM_BUFFERS[run_id] = text
@@ -481,6 +526,7 @@ def execute_focused_panel(
                 structured_brief.intake_synthesis += "\n\n## 记忆上下文(来自历史讨论:" + source.template_input.field + ")\n\n" + "\n".join(memory_parts)
         except Exception:
             pass  # source run 不存在时静默跳过
+    inject_upgrade_context(run, structured_brief)
     timeline = finish_timeline_step(timeline, "intake")
     run = update_run_checked(run.run_id, structured_brief=structured_brief, timeline=timeline)
 
@@ -958,6 +1004,7 @@ def execute_run(
     )
     ensure_not_canceled(run.run_id)
     structured_brief.intake_synthesis = intake_note
+    inject_upgrade_context(run, structured_brief)
     structured_brief.opportunity_points.append("入口 Agent 已整合模板和上传文档,讨论组以入口整合 briefing 为准。")
     timeline = finish_timeline_step(timeline, "intake")
     run = update_run_checked(run.run_id, structured_brief=structured_brief, timeline=timeline)

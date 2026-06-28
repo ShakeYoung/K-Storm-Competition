@@ -176,9 +176,17 @@ class RunCreate(BaseModel):
     probe_agent: str = ""
     probe_question: str = ""
     source_run_id: str = ""
+    upgrade_from_run_id: str = ""
     run_name: str = ""
     model_settings: AgentModelSettings | None = None
     documents: list[UploadedDocument] = Field(default_factory=list)
+
+
+class UpgradeRequest(BaseModel):
+    target_mode: DiscussionMode
+    rounds: int = Field(default=3, ge=1, le=5)
+    selected_agents: list[str] = Field(default_factory=list)
+    model_settings: AgentModelSettings | None = None
 
 
 class RunResumeRequest(BaseModel):
@@ -200,6 +208,7 @@ class RunRecord(BaseModel):
     probe_agent: str = ""
     probe_question: str = ""
     source_run_id: str = ""
+    upgrade_from_run_id: str = ""
     model_settings: AgentModelSettings = Field(default_factory=AgentModelSettings)
     structured_brief: StructuredBrief | None = None
     structured_ir: StructuredIRV2 | None = None

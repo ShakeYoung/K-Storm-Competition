@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import {
   AlertTriangle,
+  ArrowUpCircle,
   BookOpen,
   Brain,
   Check,
@@ -747,6 +748,42 @@ function App() {
     }
   }
 
+  async function handleUpgrade(sourceRun, targetMode) {
+    if (loading || !sourceRun) return;
+    const modeLabel = targetMode === "focused" ? "聚焦研讨" : "完整讨论";
+    const defaultRounds = targetMode === "focused" ? 2 : 3;
+    setLoading(true);
+    setError("");
+    setCopied(false);
+    try {
+      const resp = await fetch(`${API_BASE}/api/runs/${sourceRun.run_id}/upgrade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          target_mode: targetMode,
+          rounds: defaultRounds,
+          selected_agents: targetMode === "focused" ? (selectedAgents.length ? selectedAgents : ["novelty", "reviewer"]) : [],
+          model_settings: modelSettings,
+        }),
+      });
+      if (!resp.ok) {
+        const detail = await readError(resp);
+        throw new Error(detail || "升级失败");
+      }
+      const data = await resp.json();
+      setRun(data);
+      setRunName(data.run_name || "");
+      setDiscussionMode(targetMode);
+      setActiveRounds(defaultRounds);
+      setRounds(defaultRounds);
+      startPolling(data.run_id);
+      await loadHistory();
+    } catch (err) {
+      setError(err.message || `升级为${modeLabel}失败`);
+      setLoading(false);
+    }
+  }
+
   function _startPolling(runId) {
     if (pollRef.current) window.clearInterval(pollRef.current);
     pollRef.current = window.setInterval(async () => {
@@ -1176,6 +1213,7 @@ function App() {
               onRerun={rerunCurrent}
               onCancel={cancelCurrent}
               onConfirmRerun={confirmRerunAndEdit}
+              onUpgrade={handleUpgrade}
               streamingPartial={streamingPartial}
             />
           </div>
@@ -2165,10 +2203,10 @@ function OverviewPage({ run, history, loading, onPageNavigate, onOpenRun }) {
   );
 }
 
-function DebatePage({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun, streamingPartial }) {
+function DebatePage({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun, onUpgrade, streamingPartial }) {
   return (
     <div style={{ display: "grid", gap: 20 }}>
-      <RunOverview run={run} loading={loading} activeRounds={activeRounds} onRerun={onRerun} onCancel={onCancel} onConfirmRerun={onConfirmRerun} />
+      <RunOverview run={run} loading={loading} activeRounds={activeRounds} onRerun={onRerun} onCancel={onCancel} onConfirmRerun={onConfirmRerun} onUpgrade={onUpgrade} />
       <DebateView run={run} streamingPartial={streamingPartial} />
     </div>
   );
@@ -2341,12 +2379,21 @@ function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy
   );
 }
 
-function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun }) {
+function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmRerun, onUpgrade }) {
   const brief = run?.structured_brief;
   const isCompleted = run?.status === "COMPLETED";
   const isFailed = run?.status === "FAILED" || run?.status === "CANCELED";
   const canRerun = (isFailed || isCompleted) && !loading;
   const rerunLabel = isFailed ? "继续分析" : "重新分析";
+
+  // 升级链路：Quick Probe → Focused Panel → Full Deliberation
+  const upgradeTarget = isCompleted && !loading
+    ? run?.mode === "quick" ? "focused"
+    : run?.mode === "focused" ? "full"
+    : null
+    : null;
+  const upgradeLabel = upgradeTarget === "focused" ? "升级为聚焦研讨" : upgradeTarget === "full" ? "升级为完整讨论" : null;
+
   return (
     <section className="panel overview">
       <div className="panel-title">
@@ -2361,6 +2408,17 @@ function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmR
               停止分析
             </button>
           ) : null}
+          {upgradeTarget && (
+            <button
+              className="icon-button"
+              style={{ background: "var(--blue-50,#eff6ff)", borderColor: "var(--blue-400,#60a5fa)", color: "var(--blue-700,#1d4ed8)" }}
+              onClick={() => onUpgrade && onUpgrade(run, upgradeTarget)}
+              title="携带当前上下文，升级为更完整的讨论模式"
+            >
+              <ArrowUpCircle size={18} />
+              <span>{upgradeLabel}</span>
+            </button>
+          )}
           <button className="icon-button" disabled={!canRerun} onClick={() => {
             if (isCompleted) {
               if (window.confirm("当前记录为 COMPLETED 状态，确认重新分析？")) {
@@ -2375,6 +2433,13 @@ function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmR
           </button>
         </div>
       </div>
+
+      {upgradeTarget && (
+        <div style={{ padding: "10px 16px", background: "var(--blue-50,#eff6ff)", borderRadius: 8, border: "1px solid var(--blue-200,#bfdbfe)", marginBottom: 8, fontSize: 13, color: "var(--blue-800,#1e40af)", display: "flex", alignItems: "center", gap: 8 }}>
+          <ArrowUpCircle size={15} />
+          <span>当前为 <strong>{{quick:"快速探测",focused:"聚焦研讨"}[run.mode]}</strong>，可一键升级并自动携带上下文。</span>
+        </div>
+      )}
 
       <div className="metric-row">
         <Metric
