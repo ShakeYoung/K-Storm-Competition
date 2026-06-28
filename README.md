@@ -77,10 +77,12 @@ The detected stage is injected into every agent prompt as a **stage label + stag
 - ✅ **Validated generation** — end markers + structural checks prevent half-finished messages from advancing; auto-retry with context-preserving continuation prompt
 - ⚙️ **Per-agent model assignment** — mix mock / OpenAI-compatible / Anthropic per agent slot
 - 🏷️ **Discussion naming** — name each run for easy identification in history
-- ⚡ **USTC-107 preset** — one-click model assignment for the USTC 107 platform (GLM5.2 / DeepSeek-V4)
+- ⚡ **USTC-107 preset** — one-click model assignment for the USTC 107 platform (10 models: deepseek-v4-pro · deepseek-v4-flash · glm-5.2 · qwen3.6-chat · qwen3.6-reasoner · qwen-chat · qwen-reasoner · smart/default · smart/reasoning · deepseek-v4-flash-ascend)
 - 📝 **Markdown briefing rendering** — agent briefing blocks render inline Markdown
 - 🔒 **Thread-safe retry** — concurrent retry callbacks are lock-protected to prevent DB write conflicts
-- 🌊 **SSE streaming** — real-time run status push via Server-Sent Events
+- 🌊 **SSE token streaming** — dual-channel SSE: run-state channel (800ms snapshot) + token-stream channel (100ms buffer); phantom card transitions seamlessly to confirmed message
+- 🔍 **Critique Agent** — independent structured critique phase after all debate rounds; covers 6 risk dimensions (novelty / evidence chain / feasibility / consistency / bias / next-step risk)
+- 📚 **Citation Review Agent** — cross-validates all cited references for relevance, completeness, consistency and density; produces A/B/C/D citation quality rating
 
 ## 🏗️ Architecture
 
@@ -111,9 +113,13 @@ Moderator → conflict/omission summary + next-round question list
   ↓
 Round 2+ (serial)
   ↓
+Critique Agent → 6-dimension risk assessment report
+  ↓
 Per-agent IR summary snippets
   ↓
 Structured IR (candidate directions + evidence refs + critique points)
+  ↓
+Citation Review Agent → reference credibility audit
   ↓
 Output Agent → final Markdown report
 ```
@@ -225,7 +231,8 @@ API keys stay in your browser's `localStorage` — never written to disk or SQLi
 ```text
 POST   /api/runs                          Create a new run
 GET    /api/runs/{run_id}                 Get run status and full data
-GET    /api/runs/{run_id}/stream          SSE stream — push on status/message change
+GET    /api/runs/{run_id}/stream          SSE stream — push on status/message change (800ms)
+GET    /api/runs/{run_id}/token-stream   SSE token stream — live token buffer flush (100ms)
 GET    /api/runs/{run_id}/messages        Get debate messages
 GET    /api/runs/{run_id}/report          Get final Markdown report
 POST   /api/runs/{run_id}/rerun           Rerun from scratch

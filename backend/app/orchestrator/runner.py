@@ -8,6 +8,8 @@ import threading
 from uuid import uuid4
 
 from app.agents.registry import (
+    CITATION_REVIEW_AGENT,
+    CRITIQUE_AGENT,
     DISCUSSION_AGENTS,
     GROUP_SUMMARIZER,
     INTAKE_AGENT,
@@ -69,6 +71,8 @@ STEP_ESTIMATES = {
     "handoff": 5,
     "debate": 180,
     "group_summary": 120,
+    "critique": 150,
+    "citation_review": 120,
     "final_report": 240,
 }
 OUTPUT_LIMITS = {
@@ -77,6 +81,8 @@ OUTPUT_LIMITS = {
     "debate": 4000,
     "moderator": 3500,
     "group_summary": 4200,
+    "critique": 3500,
+    "citation_review": 3000,
     "final_report": 6000,
 }
 
@@ -90,6 +96,8 @@ END_MARKERS = {
     "debate": "<<<END_OF_AGENT_MESSAGE>>>",
     "moderator": "<<<END_OF_MODERATOR_MESSAGE>>>",
     "group_summary": "<<<END_OF_GROUP_SUMMARY>>>",
+    "critique": "<<<END_OF_CRITIQUE>>>",
+    "citation_review": "<<<END_OF_CITATION_REVIEW>>>",
     "final_report": "<<<END_OF_FINAL_REPORT>>>",
     "quick": "<<<END_OF_QUICK_PROBE>>>",
     "doc_extract": "<<<END_OF_DOC_EXTRACT>>>",
@@ -182,7 +190,7 @@ def generate_validated(
 
         # P2: detect truncation vs empty output
         body = strip_end_markers(last_text)
-        truncation_threshold = {"debate": 500, "moderator": 400, "group_summary": 400, "final_report": 600, "quick": 150, "doc_extract": 60, "intake": 100}.get(kind, 200)
+        truncation_threshold = {"debate": 500, "moderator": 400, "group_summary": 400, "critique": 400, "citation_review": 300, "final_report": 600, "quick": 150, "doc_extract": 60, "intake": 100}.get(kind, 200)
         is_truncation = len(body) >= truncation_threshold
 
         if is_truncation and attempt < attempts - 1:
@@ -229,7 +237,7 @@ def validate_output_complete(text: str, kind: str) -> list[str]:
     if marker and marker not in raw:
         errors.append(f"缺少结束标记 {marker}")
     body = strip_end_markers(raw)
-    if len(body) < {"debate": 300, "moderator": 300, "group_summary": 400, "final_report": 800, "quick": 200, "doc_extract": 80, "intake": 150}.get(kind, 200):
+    if len(body) < {"debate": 300, "moderator": 300, "group_summary": 400, "critique": 300, "citation_review": 200, "final_report": 800, "quick": 200, "doc_extract": 80, "intake": 150}.get(kind, 200):
         errors.append("正文过短,疑似截断")
     if kind == "debate":
         if "### 给结构化 IR 的要点摘要" not in body:
@@ -258,6 +266,14 @@ def validate_output_complete(text: str, kind: str) -> list[str]:
         for key in ["下一步", "证据", "风险", "阶段"]:
             if key not in body:
                 errors.append(f"最终报告缺少核心板块:{key}")
+    elif kind == "critique":
+        for key in ["创新性风险", "证据链", "可行性", "逻辑一致性", "综合风险"]:
+            if key not in body:
+                errors.append(f"批判报告缺少维度:{key}")
+    elif kind == "citation_review":
+        for key in ["引用相关性", "引用密度", "整体引用质量"]:
+            if key not in body:
+                errors.append(f"引用审查报告缺少维度:{key}")
     elif kind == "doc_extract":
         bullet_count = len(re.findall(r"[\n\r]\s*[-*•·]\s+", body)) + (1 if re.match(r"\s*[-*•·]\s+", body) else 0)
         if bullet_count < 2:
@@ -857,6 +873,10 @@ def resume_run(
         if round_number == 1 and not has_agent_message(messages, 1, MODERATOR_AGENT):
             messages, timeline, run = run_moderator_step(run, structured_brief, provider, messages, timeline)
 
+    # ── Critique 阶段（如未完成则执行）────────────────────────────────
+    if not run.critique_report:
+        _, timeline, run = run_critique_step(run, structured_brief, provider, messages, timeline)
+
     group_summary = run.group_summary
     if not group_summary:
         group_summary, timeline, run = run_group_summary_step(
@@ -878,6 +898,10 @@ def resume_run(
     if not run.external_references:
         external_references = extract_references(messages)
         run = update_run_checked(run.run_id, external_references=external_references)
+
+    # ── Citation Review 阶段（如未完成则执行）──────────────────────────
+    if not run.citation_review:
+        _, timeline, run = run_citation_review_step(run, provider, messages, timeline)
 
     if not run.final_report:
         _, timeline, run = run_final_report_step(
@@ -1008,62 +1032,18 @@ def execute_run(
             round_number,
         )
 
-    timeline = start_timeline_step(timeline, "group_summary")
-    run = update_run_checked(
-        run.run_id,
-        status=RunStatus.GROUP_SUMMARY_RUNNING,
-        current_step=f"结构化 IR({provider.label_for(GROUP_SUMMARIZER.key)})",
-        timeline=timeline,
-    )
-    group_summary = generate_validated(
-        provider,
-        agent_key=GROUP_SUMMARIZER.key,
-        system_prompt=GROUP_SUMMARIZER.system_prompt,
-        user_prompt=summary_prompt(run.template_input, structured_brief, messages, run.research_stage),
-        max_tokens=OUTPUT_LIMITS["group_summary"],
-        on_retry=retry_callback(run.run_id, "group_summary", "结构化 IR"),
-        kind="group_summary",
-        stage_label="结构化 IR",
-    )
-    ensure_not_canceled(run.run_id)
-    structured_ir = parse_structured_ir_v2(group_summary, run.template_input, structured_brief, messages)
-    group_summary = clean_structured_ir_markdown(group_summary)
-    ir_warnings = document_budget_warnings(documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
-    timeline = finish_timeline_step(timeline, "group_summary")
-    run = update_run_checked(
-        run.run_id,
-        group_summary=group_summary,
-        structured_ir=structured_ir,
-        ir_warnings=ir_warnings,
-        timeline=timeline,
-    )
+    # ── Critique 独立阶段（所有讨论轮次结束后）────────────────────────
+    _, timeline, run = run_critique_step(run, structured_brief, provider, messages, timeline)
 
-    timeline = start_timeline_step(timeline, "final_report")
-    run = update_run_checked(
-        run.run_id,
-        status=RunStatus.FINAL_REPORT_RUNNING,
-        current_step=f"出口模型生成最终报告({provider.label_for(OUTPUT_AGENT.key)})",
-        timeline=timeline,
-    )
-    final_report = clean_final_report(generate_validated(
-        provider,
-        agent_key=OUTPUT_AGENT.key,
-        system_prompt=OUTPUT_AGENT.system_prompt,
-        user_prompt=report_prompt(run.template_input, structured_brief, messages, group_summary, structured_ir, run.research_stage),
-        max_tokens=OUTPUT_LIMITS["final_report"],
-        on_retry=retry_callback(run.run_id, "final_report", "出口模型生成最终报告"),
-        kind="final_report",
-        stage_label="出口模型生成最终报告",
-    ))
-    ensure_not_canceled(run.run_id)
-    timeline = finish_timeline_step(timeline, "final_report")
-    timeline = finish_timeline_step(timeline, "overall")
-    return update_run_checked(
-        run.run_id,
-        status=RunStatus.COMPLETED,
-        final_report=final_report,
-        current_step="运行完成",
-        timeline=timeline,
+    group_summary, timeline, run = run_group_summary_step(run, structured_brief, provider, messages, timeline)
+    external_references = extract_references(messages)
+    run = update_run_checked(run.run_id, external_references=external_references)
+
+    # ── Citation Review 阶段（Group Summary 之后）─────────────────────
+    _, timeline, run = run_citation_review_step(run, provider, messages, timeline)
+
+    _, timeline, run = run_final_report_step(
+        run, structured_brief, provider, messages, run.group_summary, timeline
     )
 
 
@@ -1255,6 +1235,89 @@ def run_group_summary_step(
     timeline = finish_timeline_step(timeline, "group_summary")
     run = update_run_checked(run.run_id, group_summary=group_summary, structured_ir=structured_ir, ir_warnings=ir_warnings, timeline=timeline)
     return group_summary, timeline, run
+
+
+def run_critique_step(
+    run: RunRecord,
+    structured_brief: StructuredBrief,
+    provider: ModelProvider,
+    messages: list[DebateMessage],
+    timeline: list[TimelineStep],
+) -> tuple[str, list[TimelineStep], RunRecord]:
+    """独立批判阶段：在所有讨论轮次结束后，对整个讨论进行多维批判审查。"""
+    timeline = start_timeline_step(timeline, "critique")
+    run = update_run_checked(
+        run.run_id,
+        status=RunStatus.CRITIQUE_RUNNING,
+        current_step=f"Critique Agent 批判审查({provider.label_for(CRITIQUE_AGENT.key)})",
+        timeline=timeline,
+    )
+    _partial: list[str] = []
+    _meta = {"agent": CRITIQUE_AGENT.display_name, "step_type": "critique", "round": 0}
+    def _sink(delta: str) -> None:
+        _partial.append(delta)
+        set_stream_buffer(run.run_id, "".join(_partial), _meta)
+
+    try:
+        critique_report = generate_validated(
+            provider,
+            agent_key=CRITIQUE_AGENT.key,
+            system_prompt=CRITIQUE_AGENT.system_prompt,
+            user_prompt=critique_prompt(run.template_input, structured_brief, messages, run.research_stage),
+            max_tokens=OUTPUT_LIMITS["critique"],
+            on_retry=retry_callback(run.run_id, "critique", "Critique Agent 批判审查"),
+            kind="critique",
+            stage_label="Critique Agent 批判审查",
+            on_chunk=_sink,
+        )
+    finally:
+        clear_stream_buffer(run.run_id)
+
+    ensure_not_canceled(run.run_id)
+    timeline = finish_timeline_step(timeline, "critique")
+    run = update_run_checked(run.run_id, critique_report=critique_report, timeline=timeline)
+    return critique_report, timeline, run
+
+
+def run_citation_review_step(
+    run: RunRecord,
+    provider: ModelProvider,
+    messages: list[DebateMessage],
+    timeline: list[TimelineStep],
+) -> tuple[str, list[TimelineStep], RunRecord]:
+    """引用审查阶段：对讨论中所有 Agent 引用的文献进行语义交叉验证。"""
+    timeline = start_timeline_step(timeline, "citation_review")
+    run = update_run_checked(
+        run.run_id,
+        status=RunStatus.CITATION_REVIEW_RUNNING,
+        current_step=f"Citation Review Agent 引用审查({provider.label_for(CITATION_REVIEW_AGENT.key)})",
+        timeline=timeline,
+    )
+    _partial: list[str] = []
+    _meta = {"agent": CITATION_REVIEW_AGENT.display_name, "step_type": "citation_review", "round": 0}
+    def _sink(delta: str) -> None:
+        _partial.append(delta)
+        set_stream_buffer(run.run_id, "".join(_partial), _meta)
+
+    try:
+        citation_review = generate_validated(
+            provider,
+            agent_key=CITATION_REVIEW_AGENT.key,
+            system_prompt=CITATION_REVIEW_AGENT.system_prompt,
+            user_prompt=citation_review_prompt(run.template_input, messages),
+            max_tokens=OUTPUT_LIMITS["citation_review"],
+            on_retry=retry_callback(run.run_id, "citation_review", "Citation Review Agent 引用审查"),
+            kind="citation_review",
+            stage_label="Citation Review Agent 引用审查",
+            on_chunk=_sink,
+        )
+    finally:
+        clear_stream_buffer(run.run_id)
+
+    ensure_not_canceled(run.run_id)
+    timeline = finish_timeline_step(timeline, "citation_review")
+    run = update_run_checked(run.run_id, citation_review=citation_review, timeline=timeline)
+    return citation_review, timeline, run
 
 
 def run_final_report_step(
@@ -1482,7 +1545,9 @@ def build_timeline(
             steps.append(TimelineStep(key="moderator_round1", label="Moderator 汇总第 1 轮冲突与遗漏"))
     steps.extend(
         [
+            TimelineStep(key="critique", label="Critique Agent 批判审查", estimate_seconds=STEP_ESTIMATES["critique"]),
             TimelineStep(key="group_summary", label="结构化 IR", estimate_seconds=180),
+            TimelineStep(key="citation_review", label="Citation Review Agent 引用审查", estimate_seconds=STEP_ESTIMATES["citation_review"]),
             TimelineStep(key="final_report", label="出口模型生成最终报告", estimate_seconds=240),
         ]
     )
@@ -2172,6 +2237,138 @@ def moderator_prompt(
 
 第 1 轮发言(压缩摘要):
 {_moderator_messages_text(first_round)}
+""".strip()
+
+
+def critique_prompt(
+    template: TemplateInput,
+    brief: StructuredBrief,
+    messages: list[DebateMessage],
+    research_stage: ResearchStage | str = ResearchStage.AUTO,
+) -> str:
+    """独立批判阶段 prompt：在所有讨论轮次结束后，对整个讨论进行多维批判审查。"""
+    all_claims = []
+    for msg in messages:
+        if msg.claims:
+            all_claims.append(f"[{msg.agent} R{msg.round}] {'; '.join(msg.claims[:3])}")
+    claims_text = "\n".join(all_claims) if all_claims else "（无结构化主张摘要，请从讨论记录中提取）"
+    return f"""
+你是独立批判审查 Agent。请对以下科研头脑风暴的完整讨论进行结构化批判审查，产出风险评估报告。
+
+科研阶段：{research_stage_label(research_stage)}
+
+研究背景：
+{template_prompt(template)}
+
+入口 briefing 摘要：
+{briefing_for_report(brief)}
+
+各 Agent 核心主张摘要：
+{claims_text}
+
+完整讨论记录摘要（仅供参考，不要逐字复述）：
+{discussion_digest(messages)}
+
+请按以下六个维度逐一输出「风险等级（低/中/高）」+「具体问题描述」+「改进建议」：
+
+## 1. 创新性风险
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 2. 证据链完整性
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 3. 可行性盲点
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 4. 逻辑一致性
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 5. 偏见与盲区
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 6. 下一步风险
+风险等级：[低/中/高]
+具体问题：
+改进建议：
+
+## 综合风险评估
+综合风险等级：[低/中/高]
+最值得关注的 Top-3 风险：
+1.
+2.
+3.
+
+最后一行必须输出：<<<END_OF_CRITIQUE>>>
+""".strip()
+
+
+def citation_review_prompt(
+    template: TemplateInput,
+    messages: list[DebateMessage],
+) -> str:
+    """引用真实性审查 prompt：对所有 Agent 引用的文献进行语义交叉验证。"""
+    ref_lines = []
+    for msg in messages:
+        # 从每条发言中提取外部引用小节
+        content = msg.content or ""
+        marker = "### 外部引用"
+        idx = content.find(marker)
+        if idx >= 0:
+            section = content[idx + len(marker):]
+            end = section.find("\n###")
+            if end >= 0:
+                section = section[:end]
+            for line in section.strip().splitlines():
+                line = line.strip().lstrip("-•* ")
+                if line:
+                    ref_lines.append(f"[{msg.agent} R{msg.round}] {line}")
+    refs_text = "\n".join(ref_lines) if ref_lines else "（讨论中未发现结构化引用行，请基于发言正文分析引用情况）"
+    return f"""
+你是引用真实性审查 Agent。请对以下讨论中各 Agent 引用的外部文献进行语义真实性交叉验证。
+
+研究领域：{template.field}
+
+所有引用条目（格式：[Agent 名 轮次] 引用内容）：
+{refs_text}
+
+讨论摘要（仅供上下文，不要逐字引用）：
+{discussion_digest(messages)}
+
+请按以下四个维度进行审查，并对每条引用给出「可信度评分（高/中/低/存疑）」：
+
+## 1. 引用相关性
+（逐条检查引用与论点的相关性，标出偏题引用）
+
+## 2. 引用完整性
+（检查引用格式完整性，标出无法追溯的泛化引用）
+
+## 3. 引用一致性
+（检查不同 Agent 对同类文献的结论是否矛盾，矛盾是否已被解释）
+
+## 4. 引用密度
+（评估整体引用密度，列出缺乏文献支撑的关键论断）
+
+## 各引用可信度评分
+（逐条评分，格式：[引用条目] → 评分：高/中/低/存疑 | 理由）
+
+## 整体引用质量评级
+整体引用质量：[A/B/C/D]（A=优秀，B=良好，C=需改进，D=不足）
+需要补充文献的关键论断清单：
+1.
+2.
+3.
+
+最后一行必须输出：<<<END_OF_CITATION_REVIEW>>>
 """.strip()
 
 

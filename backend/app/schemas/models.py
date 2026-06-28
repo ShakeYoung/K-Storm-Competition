@@ -11,7 +11,9 @@ class RunStatus(StrEnum):
     TEMPLATE_VALIDATED = "TEMPLATE_VALIDATED"
     INTAKE_RUNNING = "INTAKE_RUNNING"
     DEBATE_RUNNING = "DEBATE_RUNNING"
+    CRITIQUE_RUNNING = "CRITIQUE_RUNNING"
     GROUP_SUMMARY_RUNNING = "GROUP_SUMMARY_RUNNING"
+    CITATION_REVIEW_RUNNING = "CITATION_REVIEW_RUNNING"
     FINAL_REPORT_RUNNING = "FINAL_REPORT_RUNNING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
@@ -206,6 +208,8 @@ class RunRecord(BaseModel):
     documents: list[UploadedDocument] = Field(default_factory=list)
     debate_messages: list[DebateMessage] = Field(default_factory=list)
     group_summary: str = ""
+    critique_report: str = ""
+    citation_review: str = ""
     final_report: str = ""
     error: str = ""
     current_step: str = ""

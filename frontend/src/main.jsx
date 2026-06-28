@@ -2381,7 +2381,9 @@ function ProgressTimeline({ run, activeRounds }) {
     const order = ["Novelty Agent", "Mechanism Agent", "Feasibility Agent", "Reviewer Agent"];
     steps.push([run.current_step || `${order[debateDone % 4]} 发言中`, false, true]);
   }
+  steps.push(["Critique 批判审查", Boolean(run.critique_report), status === "CRITIQUE_RUNNING"]);
   steps.push(["结构化 IR", Boolean(run.group_summary), status === "GROUP_SUMMARY_RUNNING"]);
+  steps.push(["Citation Review 引用审查", Boolean(run.citation_review), status === "CITATION_REVIEW_RUNNING"]);
   steps.push(["出口模型生成最终报告", Boolean(run.final_report), status === "FINAL_REPORT_RUNNING"]);
   if (status === "COMPLETED") steps.push(["运行完成", true, false]);
   if (status === "FAILED") {
@@ -2798,6 +2800,60 @@ function DebateView({ run, streamingPartial }) {
       ) : (
         <div className="empty-line">还没有讨论记录。</div>
       )}
+
+      {/* ── Critique 独立批判报告 ──────────────────────────────── */}
+      {(run?.critique_report || run?.status === "CRITIQUE_RUNNING") && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
+            borderBottom: "2px solid var(--rose, #B03050)", paddingBottom: 6,
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--rose, #B03050)" }}>🔍 Critique Agent · 独立批判审查</span>
+            {run?.status === "CRITIQUE_RUNNING" && !run?.critique_report && (
+              <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>● 生成中</span>
+            )}
+          </div>
+          {run?.critique_report ? (
+            <article className="agent-card" data-agent="critique" style={{ borderLeft: "3px solid var(--rose, #B03050)" }}>
+              <div className="agent-card-header">
+                <strong>Critique Agent</strong>
+                <span className="content-head"><CopyButton text={run.critique_report} /></span>
+              </div>
+              <div className="agent-card-body markdown-rendered"
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(run.critique_report) }} />
+            </article>
+          ) : (
+            <div className="empty-line">批判审查生成中…</div>
+          )}
+        </div>
+      )}
+
+      {/* ── Citation Review 引用审查报告 ──────────────────────── */}
+      {(run?.citation_review || run?.status === "CITATION_REVIEW_RUNNING") && (
+        <div style={{ marginTop: 20 }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
+            borderBottom: "2px solid var(--violet, #6B4FB8)", paddingBottom: 6,
+          }}>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--violet, #6B4FB8)" }}>📚 Citation Review Agent · 引用真实性审查</span>
+            {run?.status === "CITATION_REVIEW_RUNNING" && !run?.citation_review && (
+              <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>● 生成中</span>
+            )}
+          </div>
+          {run?.citation_review ? (
+            <article className="agent-card" data-agent="citation_review" style={{ borderLeft: "3px solid var(--violet, #6B4FB8)" }}>
+              <div className="agent-card-header">
+                <strong>Citation Review Agent</strong>
+                <span className="content-head"><CopyButton text={run.citation_review} /></span>
+              </div>
+              <div className="agent-card-body markdown-rendered"
+                dangerouslySetInnerHTML={{ __html: markdownToHtml(run.citation_review) }} />
+            </article>
+          ) : (
+            <div className="empty-line">引用审查生成中…</div>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -2845,6 +2901,10 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
       // 轻型 Agent（可行性/主持）: 优先 107 高效通用层 deepseek-v4-flash / qwen3.6-chat
       feasibility:     pick([["deepseek-v4-flash"], ["qwen3.6", "chat"], ["qwen-chat"], ["deepseek-v4"], ["glm-5.2"], ["gpt", "5.4"], ["deepseek", "pro"], ["flash"], ["plus"], ["turbo"]]),
       moderator:       pick([["deepseek-v4-flash"], ["qwen3.6", "chat"], ["qwen-chat"], ["smart", "default"], ["deepseek-v4"], ["gpt", "5.4"], ["flash"], ["plus"], ["turbo"], ["mimo", "v2.5"]]),
+      // Critique 批判（中等强度，需要一定推理能力）
+      critique:        pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["qwen3.6", "reason"], ["gpt", "5.5"], ["claude", "opus"], ["deepseek-v4-flash"], ["qwen3.6", "chat"]]),
+      // Citation Review（轻量核查，速度优先）
+      citation_review: pick([["deepseek-v4-flash"], ["qwen3.6", "chat"], ["qwen-chat"], ["smart", "default"], ["deepseek-v4"], ["flash"], ["plus"]]),
     };
     const filtered = {};
     for (const [k, v] of Object.entries(map)) { if (v) filtered[k] = v; }

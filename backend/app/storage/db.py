@@ -103,6 +103,10 @@ def init_db() -> None:
             db.execute("ALTER TABLE runs ADD COLUMN external_references TEXT NOT NULL DEFAULT '[]'")
         if "run_name" not in columns:
             db.execute("ALTER TABLE runs ADD COLUMN run_name TEXT NOT NULL DEFAULT ''")
+        if "critique_report" not in columns:
+            db.execute("ALTER TABLE runs ADD COLUMN critique_report TEXT NOT NULL DEFAULT ''")
+        if "citation_review" not in columns:
+            db.execute("ALTER TABLE runs ADD COLUMN citation_review TEXT NOT NULL DEFAULT ''")
 
 
 def create_run(
@@ -307,6 +311,8 @@ def row_to_run(row: sqlite3.Row) -> RunRecord:
         documents=[UploadedDocument.model_validate(item) for item in documents_raw],
         debate_messages=[DebateMessage.model_validate(item) for item in messages_raw],
         group_summary=row["group_summary"],
+        critique_report=row["critique_report"] if "critique_report" in row.keys() else "",
+        citation_review=row["citation_review"] if "citation_review" in row.keys() else "",
         final_report=row["final_report"],
         error=row["error"],
         current_step=row["current_step"],
