@@ -42,6 +42,5 @@ Thumbs.db
 *.log
 logs/
 
-# Local-only docs
+# Local-only / generated docs (not for review)
 docs/ui-proposals/
-K-Storm-Competition/

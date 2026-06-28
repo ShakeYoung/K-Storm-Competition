@@ -39,7 +39,7 @@ const SCENE_TEMPLATES = [
     label: "本科毕设选题",
     template: {
       field: "（请填写你的研究领域，如：计算机视觉、生物信息学、材料科学）",
-      background: "我是本科生，即将开始毕业设计。希望找到一个在本科阶段可以独立完成的选题，难度适中，有一定创新性，同时能在答辩中展示完整的研究过程。",
+      background: "我是中国科学技术大学本科生，即将开始毕业设计。希望找到一个在本科阶段可以独立完成的选题，难度适中，有一定创新性，同时能在答辩中展示完整的研究过程。",
       existing_basis: "已完成本专业主干课程，有一定的编程/实验操作能力。有导师指导，实验室有基本设备。",
       extension_points: "希望选题能结合当前热点（如 AI 赋能、多模态数据、新材料等），并有清晰可操作的实验路线。",
       core_question: "",
@@ -55,7 +55,7 @@ const SCENE_TEMPLATES = [
     label: "研究生开题构思",
     template: {
       field: "（请填写你的研究领域，如：肿瘤免疫、自然语言处理、新能源材料）",
-      background: "我是硕士/博士研究生，正在准备开题报告。需要在导师研究方向的框架内，找到一个有创新性、有发表潜力的具体课题切入点。",
+      background: "我是中国科学技术大学硕士/博士研究生，正在准备开题报告。需要在导师研究方向的框架内，找到一个有创新性、有发表潜力的具体课题切入点。",
       existing_basis: "已阅读领域内近 3 年的核心文献（请补充关键结论）。实验室已有相关数据/样本/模型系统（请补充）。",
       extension_points: "（请填写你已经有的初步想法或感兴趣的方向）",
       core_question: "（如有初步科学问题，请填写；没有可留空让 K-Storm 协助提炼）",
@@ -80,6 +80,22 @@ const SCENE_TEMPLATES = [
       target_output: "给导师/组会的转向评估报告；如转向，提供新方向的可行性分析。",
       preferred_direction: "能复用现有数据/平台的方向；风险可控、周期可预估。",
       avoid_direction: "需要从零开始学习全新技术栈的大转向；比当前课题风险更高的方向。",
+    },
+  },
+  {
+    id: "group-meeting",
+    label: "组会讨论预演",
+    template: {
+      field: "（请填写你的研究领域，如：深度学习、结构生物学、量子材料）",
+      background: "我是中国科学技术大学在读研究生，下周需要在组会上汇报进展并提出下一步计划。希望提前用多 Agent 讨论预演，找出方案的薄弱点和潜在的导师质疑方向。",
+      existing_basis: "本学期已完成的实验/工作：（请填写），主要结论：（请填写）。目前卡点：（请描述实验未达预期或数据解释困难之处）。",
+      extension_points: "（请填写你计划在组会上提出的下一步方案，K-Storm 将对其进行多角度批判和完善）",
+      core_question: "（本次组会汇报的核心问题是什么？导师最可能质疑哪个环节？）",
+      platforms: "（请填写实验室现有平台：仪器、数据库、合作单位等）",
+      constraints: "组会时间约 20 分钟；导师关注点为结果的可重复性和下一步计划的可行性。",
+      target_output: "组会汇报提纲 + 潜在问题应对清单；可直接用于 PPT 准备。",
+      preferred_direction: "有明确实验结果支撑的方向；下一步方案能在 3 个月内出数据。",
+      avoid_direction: "过于发散的探索；需要大量新资源投入的方案。",
     },
   },
 ];
@@ -144,9 +160,16 @@ const defaultModelSettings = {
       api_type: "openai_compatible",
       allow_insecure_tls: false,
       models: [
-        { id: "deepseek-v4", name: "DeepSeek-V4", model: "deepseek-v4" },
-        { id: "glm5.2", name: "GLM5.2", model: "glm5.2" },
-        { id: "deepseek-v3", name: "DeepSeek-V3", model: "deepseek-v3" },
+        { id: "deepseek-v4-pro",          name: "DeepSeek-V4-Pro（高阶）",     model: "deepseek-v4-pro" },
+        { id: "glm-5.2",                  name: "GLM-5.2（高阶）",              model: "glm-5.2" },
+        { id: "deepseek-v4-flash",        name: "DeepSeek-V4-Flash（通用）",   model: "deepseek-v4-flash" },
+        { id: "deepseek-v4-flash-ascend", name: "DeepSeek-V4-Flash-Ascend",   model: "deepseek-v4-flash-ascend" },
+        { id: "qwen3.6-reasoner",         name: "Qwen3.6-Reasoner（推理）",    model: "qwen3.6-reasoner" },
+        { id: "qwen3.6-chat",             name: "Qwen3.6-Chat（通用）",        model: "qwen3.6-chat" },
+        { id: "qwen-reasoner",            name: "Qwen-Reasoner",               model: "qwen-reasoner" },
+        { id: "qwen-chat",                name: "Qwen-Chat",                   model: "qwen-chat" },
+        { id: "smart-default",            name: "Smart/Default",               model: "smart/default" },
+        { id: "smart-reasoning",          name: "Smart/Reasoning",             model: "smart/reasoning" },
       ],
     },
     {
@@ -2751,14 +2774,16 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
       return allModels[fallbackIdx ?? 0]?.value || "";
     }
     const map = {
-      intake: pick([["gpt", "5.5"], ["claude", "opus"], ["glm", "5.1"], ["deepseek", "pro"], ["mimo", "pro"], ["qwen", "max"], ["kimi"]]),
-      novelty: pick([["gpt", "5.5"], ["claude", "opus"], ["gpt", "5.4"], ["mimo", "pro"], ["flash"], ["plus"]]),
-      mechanism: pick([["gpt", "5.5"], ["claude", "opus"], ["deepseek", "pro"], ["glm", "5.1"], ["mimo", "pro"], ["qwen", "max"]]),
-      feasibility: pick([["gpt", "5.4"], ["deepseek", "pro"], ["flash"], ["plus"], ["turbo"]]),
-      reviewer: pick([["claude", "opus"], ["gpt", "5.5"], ["deepseek", "pro"], ["glm", "5.1"], ["mimo", "pro"]]),
-      moderator: pick([["gpt", "5.4"], ["flash"], ["plus"], ["turbo"], ["mimo", "v2.5"]]),
-      group_summarizer: pick([["deepseek", "pro"], ["gpt", "5.4"], ["glm", "5.1"], ["mimo", "pro"], ["claude", "opus"]]),
-      output: pick([["gpt", "5.5"], ["claude", "opus"], ["deepseek", "pro"], ["glm", "5.1"], ["mimo", "pro"], ["qwen", "max"]]),
+      // 重型 Agent（入口/创新/机制/审稿/汇总/输出）: 优先 107 高阶推理层 deepseek-v4-pro / glm-5.2
+      intake:          pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["gpt", "5.5"], ["claude", "opus"], ["deepseek", "pro"], ["glm", "5.1"], ["mimo", "pro"], ["qwen", "max"]]),
+      novelty:         pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["gpt", "5.5"], ["claude", "opus"], ["mimo", "pro"], ["flash"], ["plus"]]),
+      mechanism:       pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["gpt", "5.5"], ["claude", "opus"], ["deepseek", "pro"], ["mimo", "pro"], ["qwen", "max"]]),
+      reviewer:        pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["claude", "opus"], ["gpt", "5.5"], ["deepseek", "pro"], ["mimo", "pro"]]),
+      group_summarizer:pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["deepseek", "pro"], ["gpt", "5.4"], ["glm", "5.1"], ["claude", "opus"]]),
+      output:          pick([["deepseek-v4-pro"], ["glm-5.2"], ["deepseek-v4"], ["glm", "5.2"], ["qwen3.6", "reason"], ["gpt", "5.5"], ["claude", "opus"], ["deepseek", "pro"], ["mimo", "pro"], ["qwen", "max"]]),
+      // 轻型 Agent（可行性/主持）: 优先 107 高效通用层 deepseek-v4-flash / qwen3.6-chat
+      feasibility:     pick([["deepseek-v4-flash"], ["qwen3.6", "chat"], ["qwen-chat"], ["deepseek-v4"], ["glm-5.2"], ["gpt", "5.4"], ["deepseek", "pro"], ["flash"], ["plus"], ["turbo"]]),
+      moderator:       pick([["deepseek-v4-flash"], ["qwen3.6", "chat"], ["qwen-chat"], ["smart", "default"], ["deepseek-v4"], ["gpt", "5.4"], ["flash"], ["plus"], ["turbo"], ["mimo", "v2.5"]]),
     };
     const filtered = {};
     for (const [k, v] of Object.entries(map)) { if (v) filtered[k] = v; }
