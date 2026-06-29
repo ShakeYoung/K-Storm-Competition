@@ -23,7 +23,9 @@ from app.schemas.models import (
 )
 
 
-DB_PATH = Path(__file__).resolve().parents[3] / "data" / "ks.sqlite3"
+import os as _os
+_data_env = _os.environ.get("K_STORM_DATA_DIR")
+DB_PATH = Path(_data_env) / "ks.sqlite3" if _data_env else Path(__file__).resolve().parents[3] / "data" / "ks.sqlite3"
 
 
 def utc_now() -> str:

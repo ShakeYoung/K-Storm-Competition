@@ -44,3 +44,9 @@ logs/
 
 # Local-only / generated docs (not for review)
 docs/ui-proposals/
+
+# Desktop packaging build artifacts
+backend/build/
+backend/dist/
+release/
+k-storm-icon.iconset/

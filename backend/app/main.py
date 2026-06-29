@@ -86,7 +86,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+import os as _os
+_static_env = _os.environ.get("K_STORM_STATIC_DIR")
+STATIC_DIR = Path(_static_env) if _static_env else Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 ASSETS_DIR = STATIC_DIR / "assets"

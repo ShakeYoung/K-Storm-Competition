@@ -1,0 +1,58 @@
+{
+  "name": "k-storm",
+  "version": "2.0.0",
+  "description": "Local multi-agent research topic brainstorming workbench",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "electron:dev": "electron .",
+    "electron:build": "electron-builder --mac",
+    "electron:build:win": "electron-builder --win",
+    "build:all": "bash build.sh"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.apech.k-storm",
+    "productName": "K-Storm",
+    "copyright": "Copyright © 2026 apech",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "backend/dist/k-storm-server",
+        "to": "k-storm-server",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/k-storm-icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] },
+        { "target": "zip", "arch": ["arm64", "x64"] }
+      ]
+    },
+    "dmg": {
+      "title": "K-Storm ${version}",
+      "window": { "width": 540, "height": 380 }
+    },
+    "win": {
+      "icon": "assets/k-storm-icon.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

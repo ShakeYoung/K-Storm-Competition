@@ -86,6 +86,8 @@ The detected stage is injected into every agent prompt as a **stage label + stag
 - 🔍 **Critique Agent** — independent structured critique phase after all debate rounds; covers 6 risk dimensions (novelty / evidence chain / feasibility / consistency / bias / next-step risk)
 - 📚 **Citation Review Agent** — cross-validates all cited references for relevance, completeness, consistency and density; produces A/B/C/D citation quality rating
 - 🧠 **TF-IDF cross-run memory search** — extracts 5-type MemoryEntries (directions / decisions / claims / critiques / opportunities) from all completed runs' StructuredIRV2; pure stdlib bigram TF-IDF cosine retrieval with type and field filters; accessible via the "跨 Run 知识检索" tab in Memory Query mode
+- 🔢 **Per-card character count** — each debate agent card shows a live character count badge (top-right), giving an at-a-glance sense of output length without opening the card
+- 🔎 **In-debate keyword search** — search bar inline with round tabs; filters cards to only those containing the keyword and highlights every match in yellow; shows a live match count; one-click clear
 
 ## 🏗️ Architecture
 
