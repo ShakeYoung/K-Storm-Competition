@@ -6,17 +6,21 @@ import {
   BookOpen,
   Brain,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clipboard,
   Download,
   FileUp,
   FlaskConical,
   History,
   LoaderCircle,
+  Maximize2,
   Play,
   RefreshCw,
   Search,
   Settings,
   Sparkles,
+  X,
 } from "lucide-react";
 import "./styles/app.css";
 
@@ -1329,6 +1333,8 @@ function agentKeyFromDisplay(displayName) {
     "Intake Agent": "intake",
     "Group Summarizer": "group_summarizer",
     "Output Agent": "output",
+    "Critique Agent": "critique",
+    "Citation Review Agent": "citation_review",
   };
   return map[displayName] || displayName.toLowerCase().split(" ")[0];
 }
@@ -2584,6 +2590,57 @@ function CopyButton({ text, className = "" }) {
   );
 }
 
+function ExpandButton({ onClick, title = "全文查看" }) {
+  return (
+    <button className="icon-button expand-mini" onClick={onClick} title={title}>
+      <Maximize2 size={13} />
+    </button>
+  );
+}
+
+function MessageExpandModal({ message, onClose }) {
+  React.useEffect(() => {
+    if (!message) return;
+    function onKey(e) { if (e.key === "Escape") onClose(); }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [message, onClose]);
+
+  if (!message) return null;
+
+  const agentKey = agentKeyFromDisplay(message.agent);
+
+  return (
+    <div className="msg-expand-overlay" onClick={onClose}>
+      <div
+        className="msg-expand-modal"
+        data-agent={agentKey}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="msg-expand-header">
+          <div className="msg-expand-title">
+            <strong>{message.agent}</strong>
+            {message.model_label && (
+              <span className="agent-model-label">{message.model_label}</span>
+            )}
+            <span className="msg-expand-round">第 {message.round} 轮</span>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <CopyButton text={message.content} />
+            <button className="icon-button copy-mini" onClick={onClose} title="关闭 (Esc)">
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+        <div
+          className="msg-expand-body markdown-rendered"
+          dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function ProgressTimeline({ run, activeRounds }) {
   const [expanded, setExpanded] = React.useState(false);
   if (!run) return null;
@@ -2943,6 +3000,7 @@ function DebateFlowChart({ run, onSelectRound }) {
 function DebateView({ run, streamingPartial }) {
   const [activeRound, setActiveRound] = React.useState(1);
   const [showChart, setShowChart] = React.useState(true);
+  const [expandedMsg, setExpandedMsg] = React.useState(null);
   const grouped = React.useMemo(() => {
     const map = new Map();
     for (const message of run?.debate_messages ?? []) {
@@ -2956,6 +3014,10 @@ function DebateView({ run, streamingPartial }) {
       setActiveRound(grouped[0][0]);
     }
   }, [grouped, activeRound]);
+  const roundList = grouped.map(([r]) => r);
+  const roundIdx = roundList.indexOf(activeRound);
+  const goPrevRound = () => roundIdx > 0 && setActiveRound(roundList[roundIdx - 1]);
+  const goNextRound = () => roundIdx < roundList.length - 1 && setActiveRound(roundList[roundIdx + 1]);
   const activeMessages =
     grouped.find(([round]) => round === activeRound)?.[1] || [];
 
@@ -2983,16 +3045,34 @@ function DebateView({ run, streamingPartial }) {
 
       {grouped.length ? (
         <div className="rounds">
-          <div className="round-tabs">
-            {grouped.map(([round]) => (
-              <button
-                className={`icon-button round-tab ${round === activeRound ? "active" : ""}`}
-                key={round}
-                onClick={() => setActiveRound(round)}
-              >
-                第 {round} 轮
-              </button>
-            ))}
+          <div className="round-tabs-row">
+            <button
+              className="icon-button round-nav-arrow"
+              disabled={roundIdx <= 0}
+              onClick={goPrevRound}
+              title="上一轮"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <div className="round-tabs">
+              {grouped.map(([round]) => (
+                <button
+                  className={`icon-button round-tab ${round === activeRound ? "active" : ""}`}
+                  key={round}
+                  onClick={() => setActiveRound(round)}
+                >
+                  第 {round} 轮
+                </button>
+              ))}
+            </div>
+            <button
+              className="icon-button round-nav-arrow"
+              disabled={roundIdx >= roundList.length - 1}
+              onClick={goNextRound}
+              title="下一轮"
+            >
+              <ChevronRight size={15} />
+            </button>
           </div>
           <div className="round">
             <div className="round-heading">第 {activeRound} 轮</div>
@@ -3004,6 +3084,7 @@ function DebateView({ run, streamingPartial }) {
                     <span className="agent-model-label">{message.model_label || ""}</span>
                     <span className="content-head">
                       <CopyButton text={message.content} />
+                      <ExpandButton onClick={() => setExpandedMsg(message)} />
                     </span>
                   </div>
                   <div
@@ -3062,7 +3143,10 @@ function DebateView({ run, streamingPartial }) {
             <article className="agent-card" data-agent="critique" style={{ borderLeft: "3px solid var(--rose, #B03050)" }}>
               <div className="agent-card-header">
                 <strong>Critique Agent</strong>
-                <span className="content-head"><CopyButton text={run.critique_report} /></span>
+                <span className="content-head">
+                  <CopyButton text={run.critique_report} />
+                  <ExpandButton onClick={() => setExpandedMsg({ agent: "Critique Agent", content: run.critique_report, round: "—", model_label: "" })} />
+                </span>
               </div>
               <div className="agent-card-body markdown-rendered"
                 dangerouslySetInnerHTML={{ __html: markdownToHtml(run.critique_report) }} />
@@ -3089,7 +3173,10 @@ function DebateView({ run, streamingPartial }) {
             <article className="agent-card" data-agent="citation_review" style={{ borderLeft: "3px solid var(--violet, #6B4FB8)" }}>
               <div className="agent-card-header">
                 <strong>Citation Review Agent</strong>
-                <span className="content-head"><CopyButton text={run.citation_review} /></span>
+                <span className="content-head">
+                  <CopyButton text={run.citation_review} />
+                  <ExpandButton onClick={() => setExpandedMsg({ agent: "Citation Review Agent", content: run.citation_review, round: "—", model_label: "" })} />
+                </span>
               </div>
               <div className="agent-card-body markdown-rendered"
                 dangerouslySetInnerHTML={{ __html: markdownToHtml(run.citation_review) }} />
@@ -3099,6 +3186,8 @@ function DebateView({ run, streamingPartial }) {
           )}
         </div>
       )}
+
+      <MessageExpandModal message={expandedMsg} onClose={() => setExpandedMsg(null)} />
     </section>
   );
 }
