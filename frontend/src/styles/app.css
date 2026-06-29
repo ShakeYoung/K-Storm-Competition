@@ -1674,6 +1674,80 @@ select:focus {
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
+/* ── Char count badge ── */
+.char-count-badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--panel-muted, #f0f4ff);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1px 7px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Debate keyword search ── */
+.debate-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 220px;
+  margin-left: auto;
+}
+.debate-search-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--muted);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+.debate-search-input {
+  width: 100%;
+  height: 32px;
+  padding: 0 28px 0 28px;
+  font-size: 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--panel-strong);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.debate-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+  transform: none;
+}
+.debate-search-clear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: var(--muted);
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.debate-search-clear:hover { color: var(--ink); background: var(--panel-strong); }
+.debate-search-hint {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* ── Keyword highlight mark ── */
+mark.kw-hl {
+  background: #fff176;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 /* ── Round nav arrows + tabs row ── */
 .round-tabs-row {
   display: flex;

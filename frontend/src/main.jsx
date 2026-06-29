@@ -3001,6 +3001,9 @@ function DebateView({ run, streamingPartial }) {
   const [activeRound, setActiveRound] = React.useState(1);
   const [showChart, setShowChart] = React.useState(true);
   const [expandedMsg, setExpandedMsg] = React.useState(null);
+  const [searchKeyword, setSearchKeyword] = React.useState("");
+  const searchRef = React.useRef(null);
+
   const grouped = React.useMemo(() => {
     const map = new Map();
     for (const message of run?.debate_messages ?? []) {
@@ -3018,8 +3021,13 @@ function DebateView({ run, streamingPartial }) {
   const roundIdx = roundList.indexOf(activeRound);
   const goPrevRound = () => roundIdx > 0 && setActiveRound(roundList[roundIdx - 1]);
   const goNextRound = () => roundIdx < roundList.length - 1 && setActiveRound(roundList[roundIdx + 1]);
-  const activeMessages =
-    grouped.find(([round]) => round === activeRound)?.[1] || [];
+
+  const allMessages = grouped.find(([round]) => round === activeRound)?.[1] || [];
+  const kw = searchKeyword.trim();
+  const activeMessages = kw
+    ? allMessages.filter((m) => m.content.toLowerCase().includes(kw.toLowerCase()))
+    : allMessages;
+  const hiddenCount = allMessages.length - activeMessages.length;
 
   return (
     <section className="panel">
@@ -3045,6 +3053,7 @@ function DebateView({ run, streamingPartial }) {
 
       {grouped.length ? (
         <div className="rounds">
+          {/* ── 轮次导航 + 搜索框同行 ── */}
           <div className="round-tabs-row">
             <button
               className="icon-button round-nav-arrow"
@@ -3073,26 +3082,66 @@ function DebateView({ run, streamingPartial }) {
             >
               <ChevronRight size={15} />
             </button>
+            <div className="debate-search-wrap">
+              <Search size={13} className="debate-search-icon" />
+              <input
+                ref={searchRef}
+                className="debate-search-input"
+                type="text"
+                placeholder="关键词高亮搜索…"
+                value={searchKeyword}
+                onChange={(e) => setSearchKeyword(e.target.value)}
+              />
+              {kw && (
+                <button
+                  className="debate-search-clear"
+                  onClick={() => { setSearchKeyword(""); searchRef.current?.focus(); }}
+                  title="清除"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {kw && (
+              <span className="debate-search-hint">
+                {activeMessages.length > 0
+                  ? `${activeMessages.length}/${allMessages.length} 条`
+                  : "无匹配"}
+              </span>
+            )}
           </div>
+
           <div className="round">
             <div className="round-heading">第 {activeRound} 轮</div>
+            {activeMessages.length === 0 && kw && (
+              <div className="empty-line" style={{ marginTop: 12 }}>
+                当前轮次无 "{kw}" 相关内容
+              </div>
+            )}
             <div className="message-grid">
-              {activeMessages.map((message) => (
+              {activeMessages.map((message) => {
+                const charCount = message.content.length;
+                const renderedHtml = kw
+                  ? highlightKeyword(markdownToHtml(message.content), kw)
+                  : markdownToHtml(message.content);
+                return (
                 <article className="agent-card" data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
                   <div className="agent-card-header">
                     <strong>{message.agent}</strong>
                     <span className="agent-model-label">{message.model_label || ""}</span>
                     <span className="content-head">
+                      <span className="char-count-badge">{charCount.toLocaleString()} 字</span>
                       <CopyButton text={message.content} />
                       <ExpandButton onClick={() => setExpandedMsg(message)} />
                     </span>
                   </div>
                   <div
                     className="agent-card-body markdown-rendered"
-                    dangerouslySetInnerHTML={{ __html: markdownToHtml(message.content) }}
+                    dangerouslySetInnerHTML={{ __html: renderedHtml }}
                   />
                 </article>
-              ))}
+                );
+              })}
               {/* 流式幻影卡片：当前正在生成的 agent token 流 */}
               {(() => {
                 const sp = streamingPartial;
@@ -3605,6 +3654,18 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
         </section>
       </div>
     </section>
+  );
+}
+
+/**
+ * 在已渲染的 HTML 文本节点中高亮关键词（只替换 >…< 之间的文本，不动标签属性）。
+ */
+function highlightKeyword(html, keyword) {
+  if (!keyword || !keyword.trim()) return html;
+  const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${esc})`, "gi");
+  return html.replace(/>([^<]+)</g, (_, text) =>
+    ">" + text.replace(re, '<mark class="kw-hl">$1</mark>') + "<"
   );
 }
 
