@@ -1,6 +1,6 @@
 {
   "name": "k-storm",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Local multi-agent research topic brainstorming workbench",
   "main": "electron/main.js",
   "private": true,
@@ -29,12 +29,19 @@
       {
         "from": "backend/dist/k-storm-server",
         "to": "k-storm-server",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "assets",
         "to": "assets",
-        "filter": ["k-storm-icon.icns", "k-storm-icon.ico", "k-storm-icon.png", "k-storm-icon.svg"]
+        "filter": [
+          "k-storm-icon.icns",
+          "k-storm-icon.ico",
+          "k-storm-icon.png",
+          "k-storm-icon.svg"
+        ]
       }
     ],
     "mac": {
@@ -43,17 +50,39 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] },
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ]
     },
     "dmg": {
       "title": "K-Storm ${version}",
-      "window": { "width": 540, "height": 380 }
+      "window": {
+        "width": 540,
+        "height": 380
+      }
     },
     "win": {
       "icon": "assets/k-storm-icon.ico",
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
