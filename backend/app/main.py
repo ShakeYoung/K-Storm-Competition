@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 import json
 import logging
+import os
 import ssl
 import urllib.error
 import urllib.request
@@ -34,7 +35,21 @@ from app.schemas.models import (
 from app.storage import db
 
 
-app = FastAPI(title="K-Storm API", version="0.1.0")
+def resolve_app_version() -> str:
+    if os.environ.get("K_STORM_APP_VERSION"):
+        return os.environ["K_STORM_APP_VERSION"]
+    package_json = Path(__file__).resolve().parents[2] / "package.json"
+    if package_json.exists():
+        try:
+            return json.loads(package_json.read_text(encoding="utf-8")).get("version", "0.0.0")
+        except Exception:
+            return "0.0.0"
+    return "0.0.0"
+
+
+APP_VERSION = resolve_app_version()
+
+app = FastAPI(title="K-Storm API", version=APP_VERSION)
 
 KNOWN_MODEL_PRESETS = {
     "ustc-107": [
@@ -103,7 +118,7 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.post("/api/models/discover")

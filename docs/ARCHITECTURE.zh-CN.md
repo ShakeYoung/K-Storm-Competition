@@ -429,11 +429,19 @@ K-Storm/
 - 从总览/历史打开运行中的讨论时自动恢复 polling
 - COMPLETED 记录确认后预填模板重跑
 
-### 待开发
+### V2.0 / 参赛版已补充
 
-- 证据语义审查 Agent（待实验数据后评估）
-- Critique 独立阶段
-- 记忆检索引擎（TF-IDF / embedding）
-- 模式升级链路（Quick → Focused → Full）
-- 预置 Panel 模板
-- SSE 实时推送
+- Critique Agent 独立阶段：讨论结束后进行六维风险审查。
+- Citation Review Agent：对外部引用进行语义真实性和支撑关系审查。
+- TF-IDF 跨 Run 记忆检索：从 StructuredIRV2 和 StructuredBrief 中提取候选方向、关键主张、批判点和机会点。
+- 模式升级链路：Quick Probe → Focused Panel → Full Deliberation，并自动携带前序上下文。
+- SSE 实时推送：状态流和 token 流双通道。
+- 参赛演示模式：内置高质量科研训练案例，一键填入模板。
+- 桌面封装支持：Electron 启动 PyInstaller 后端，用户数据写入应用数据目录。
+
+### 后续优化方向
+
+- 补充端到端冒烟测试和参赛演示脚本。
+- 验证 Windows 正式发行包的 `.ico` 图标显示与 NSIS 安装流程。
+- 将平台适配截图纳入 `docs/screenshots/`，用于比赛提交材料。
+- 在 V2 阶段继续增强文档 chunk 级检索和更细粒度证据绑定。

@@ -97,6 +97,7 @@ K-Storm 根据模板信息密度自动判断当前所处的科研周期阶段，
 - 🧠 **TF-IDF 跨 Run 记忆检索** — 从所有已完成 Run 的 StructuredIRV2 中提取 5 类 MemoryEntry（候选方向 / 决策摘要 / 关键主张 / 批判点 / 机会点），纯 Python stdlib 字符 bigram + 余弦相似度检索，支持类型与研究领域过滤；在记忆查询模式的「跨 Run 知识检索」Tab 中使用
 - 🔢 **卡片字数角标** — 每个 debate Agent 卡片右上角显示实时字符数角标，无需展开即可感知输出长度
 - 🔎 **讨论内关键词搜索** — 搜索框与轮次标签同行；按关键词过滤 Agent 卡片，同时在卡片内高亮所有匹配文字（黄色标注）；显示匹配数量，一键清除
+- 🏁 **参赛演示模式** — 内置 3 个高质量科研训练案例，覆盖组会预演、结果诊断和本科科研选题，一键填入模板并命名 Run
 
 ## 🏗️ 系统架构
 
@@ -223,6 +224,12 @@ npm run dev
 | 科大107平台预置 | GLM5.2 / DeepSeek-V4（一键分配） |
 
 API Key 仅保存在浏览器 `localStorage` 中，不会写入磁盘或 SQLite。
+
+### 中国科大 107 平台与参赛说明
+
+- 平台适配：见 [docs/USTC-107-PLATFORM-GUIDE.zh-CN.md](docs/USTC-107-PLATFORM-GUIDE.zh-CN.md)
+- 封装程序版本管理：见 [docs/VERSIONING.zh-CN.md](docs/VERSIONING.zh-CN.md)
+- 参赛演示：在“新建讨论”页使用“参赛演示模式”，可一键加载科研训练、组会预演和结果诊断案例。
 
 <details>
 <summary><b>常用 Base URL</b></summary>

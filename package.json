@@ -30,6 +30,11 @@
         "from": "backend/dist/k-storm-server",
         "to": "k-storm-server",
         "filter": ["**/*"]
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["k-storm-icon.icns", "k-storm-icon.ico", "k-storm-icon.png", "k-storm-icon.svg"]
       }
     ],
     "mac": {

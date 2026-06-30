@@ -33,6 +33,14 @@ function getUserDataDir() {
   return path.join(app.getPath("userData"), "data");
 }
 
+function getAppIconPath() {
+  const iconName = process.platform === "darwin" ? "k-storm-icon.icns" : "k-storm-icon.png";
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "assets", iconName);
+  }
+  return path.join(__dirname, "..", "assets", iconName);
+}
+
 // ── Start the backend process ─────────────────────────────────────────────────
 function startBackend() {
   const serverPath = getServerBinaryPath();
@@ -46,6 +54,7 @@ function startBackend() {
       ...process.env,
       K_STORM_PORT: String(PORT),
       K_STORM_DATA_DIR: dataDir,
+      K_STORM_APP_VERSION: app.getVersion(),
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -104,7 +113,7 @@ async function createWindow() {
     minWidth: 960,
     minHeight: 600,
     title: "K-Storm",
-    // Use the SVG icon (electron-builder handles .icns for the dock)
+    icon: getAppIconPath(),
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
     webPreferences: {
       nodeIntegration: false,

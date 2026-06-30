@@ -109,6 +109,19 @@ h3 { font-size: 15px; font-weight: 720; }
   padding: 16px 24px;
   flex: 0 0 auto;
   z-index: 10;
+  -webkit-app-region: drag;
+}
+
+button,
+input,
+textarea,
+select,
+a,
+.left-nav,
+.main-stage,
+.intel-rail,
+.header-actions {
+  -webkit-app-region: no-drag;
 }
 
 .brand {
@@ -372,6 +385,70 @@ h3 { font-size: 15px; font-weight: 720; }
 .field b {
   color: var(--danger);
   margin-left: 3px;
+}
+
+.template-panel textarea,
+.template-panel input {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.template-panel textarea:focus,
+.template-panel input:focus {
+  color: var(--ink-soft);
+}
+
+.demo-mode-card {
+  background: linear-gradient(135deg, #F7FAFF 0%, #EEF4FF 100%);
+  border: 1px solid rgba(26, 82, 184, 0.18);
+  border-radius: var(--radius-sm);
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 10px;
+  padding: 12px;
+}
+
+.demo-mode-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.demo-mode-head strong {
+  color: var(--accent-strong);
+  display: block;
+  font-size: 13px;
+}
+
+.demo-mode-head span {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.demo-case-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.demo-case-button {
+  background: var(--panel-strong);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 36px;
+  padding: 0 10px;
+  text-align: center;
+}
+
+.demo-case-button:hover {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
 }
 
 textarea {

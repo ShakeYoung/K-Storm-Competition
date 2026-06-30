@@ -106,6 +106,60 @@ const SCENE_TEMPLATES = [
   },
 ];
 
+const COMPETITION_DEMOS = [
+  {
+    id: "demo-group-meeting-ai",
+    label: "组会预演：多模态科研助手",
+    runName: "参赛演示-组会预演-多模态科研助手",
+    template: {
+      field: "多模态大模型与科研训练智能体",
+      background: "课题组希望建设一个面向本科生科研训练的 AI 助手，帮助学生从文献阅读、问题拆解、实验设计到组会汇报形成闭环。当前已有若干课程项目和公开论文数据，但学生常见问题是选题过大、验证路径不清晰、组会汇报缺少可辩护的证据链。",
+      existing_basis: "已有基础包括：1）课程项目中积累的 42 份学生开题草稿；2）实验室已有论文阅读模板和组会记录；3）可调用中国科大 107 算力平台上的通用对话模型和推理模型；4）已有一个 React + FastAPI 原型，可完成多 Agent 讨论和 Markdown 报告导出。",
+      extension_points: "希望把系统从普通问答升级为科研决策工作台：由 Novelty、Mechanism、Feasibility、Reviewer 等 Agent 分工讨论，输出候选选题排序、风险批判、证据绑定和下一步行动清单。",
+      core_question: "如何把多智能体系统设计成真正服务科研训练的工具，而不是停留在聊天式建议？哪些功能最能体现教学赋能和科研支持价值？",
+      platforms: "中国科大 107 算力平台模型；OpenAI Compatible API；React/Vite 前端；FastAPI 后端；SQLite 本地历史库；Markdown/PDF/JSON 导出。",
+      constraints: "参赛作品需要在演示现场稳定运行；输入材料可能包含未公开组会内容，因此优先本地存储；演示时间有限，需要 3-5 分钟内展示完整价值链。",
+      target_output: "参赛演示报告、设计文档、系统演示视频脚本，以及可运行的智能体开发作品。",
+      preferred_direction: "强调科研训练、组会决策、证据追踪和本地隐私；优先展示 107 平台模型适配和多 Agent 协作闭环。",
+      avoid_direction: "避免泛化成通用聊天机器人；避免只展示界面而缺少结构化中间产物；避免依赖不可复现的在线数据源。",
+    },
+  },
+  {
+    id: "demo-result-diagnosis-bio",
+    label: "结果诊断：单细胞实验偏差",
+    runName: "参赛演示-结果诊断-单细胞实验偏差",
+    template: {
+      field: "肿瘤免疫与单细胞测序结果诊断",
+      background: "课题原计划验证某免疫细胞亚群在治疗响应中的作用，但最新单细胞测序分析显示目标亚群比例变化不稳定，不同样本批次之间差异较大。学生需要在组会上说明结果是否仍支持原假设，并提出下一步补充实验。",
+      existing_basis: "已有 18 例样本的 scRNA-seq 初步分析；目标细胞亚群在响应组中平均提高约 1.4 倍，但 p 值不稳定；两个批次的细胞捕获率差异明显；已有流式抗体面板和 6 例可追加验证样本。",
+      extension_points: "可以考虑从细胞比例转向功能状态评分，或结合 TCR 克隆扩增、细胞通讯分析、流式验证来解释差异。也可以评估当前路线是否需要局部转向。",
+      core_question: "当前结果到底是生物学异质性、批次效应，还是原假设不成立？下一步应优先做哪些低成本验证？",
+      platforms: "Seurat/Scanpy 分析流程；流式细胞术；少量临床样本；公开单细胞数据库；实验室现有 qPCR 和免疫荧光平台。",
+      constraints: "组会前还有 10 天；追加样本有限；预算不支持重新做大规模单细胞测序；需要在 4 周内给导师一个明确推进或调整建议。",
+      target_output: "结果诊断报告、组会答辩要点、2-4 周补充实验计划。",
+      preferred_direction: "优先复用现有数据；先做可快速证伪的验证；报告中明确区分确定结论、可疑结论和待验证假设。",
+      avoid_direction: "避免直接扩大样本量但不解决批次问题；避免把统计不稳的趋势包装成强结论。",
+    },
+  },
+  {
+    id: "demo-undergrad-materials",
+    label: "本科科研：催化材料选题",
+    runName: "参赛演示-本科科研-催化材料选题",
+    template: {
+      field: "新能源催化材料与机器学习辅助筛选",
+      background: "一名本科生希望围绕新能源催化材料做毕业设计，目标是在有限实验条件下形成完整研究闭环。学生有 Python 基础和材料化学课程背景，但没有足够时间开展大规模合成实验。",
+      existing_basis: "已学习基本机器学习模型和材料数据库检索；实验室可提供少量电化学测试机会；导师已有部分过渡金属催化剂数据；学生可使用公开数据库和 107 算力平台进行模型训练或候选材料筛选。",
+      extension_points: "希望结合公开材料数据、简单可解释模型和少量实验验证，提出一个难度适中但有创新性的毕设课题。",
+      core_question: "如何设计一个本科阶段可完成、又能体现 AI 赋能材料科研的选题？候选方向应如何排序？",
+      platforms: "Python、scikit-learn、公开材料数据库、107 算力平台、实验室电化学测试平台、导师已有小规模数据。",
+      constraints: "总周期 6 个月；每周投入约 15 小时；实验验证机会有限；不能依赖昂贵试剂或大规模 DFT 计算。",
+      target_output: "本科毕业论文、答辩 PPT、可复现实验代码和 1 个小规模验证结果。",
+      preferred_direction: "可解释、可复现、实验闭环清晰；优先使用公开数据和现有平台。",
+      avoid_direction: "避免纯模型刷榜；避免需要大量湿实验或昂贵计算资源的方案。",
+    },
+  },
+];
+
 const requiredFields = ["field", "background", "existing_basis"];
 
 const formFields = [
@@ -1530,8 +1584,17 @@ function TemplatePanel({
   const [selectedScene, setSelectedScene] = React.useState("");
   const isQuickOrMemory = mode === "quick" || mode === "memory";
   const submitLabel = mode === "quick" ? "快速探测" : mode === "memory" ? "查询记忆" : mode === "focused" ? "启动专题研讨" : "开始分析";
+
+  function applyTemplatePreset(preset, sceneId = "") {
+    setTemplate((current) => ({ ...current, ...preset.template }));
+    setSelectedScene(sceneId);
+    if (preset.runName && setRunName) {
+      setRunName(preset.runName);
+    }
+  }
+
   return (
-    <div className="panel" style={{ display: "grid", gap: 0, overflow: "auto" }}>
+    <div className="panel template-panel" style={{ display: "grid", gap: 0, overflow: "auto" }}>
       <div className="pane-heading">
         <div>
           <h2>{{full: "头脑风暴", focused: "头脑风暴聚焦版", quick: "头脑风暴快速版"}[mode] || "头脑风暴"}</h2>
@@ -1546,17 +1609,36 @@ function TemplatePanel({
         </div>
       </div>
 
+      <div className="demo-mode-card">
+        <div className="demo-mode-head">
+          <div>
+            <strong>参赛演示模式</strong>
+            <span>内置高质量案例，适合录制视频和现场快速展示。</span>
+          </div>
+        </div>
+        <div className="demo-case-grid">
+          {COMPETITION_DEMOS.map((demo) => (
+            <button
+              key={demo.id}
+              className="demo-case-button"
+              onClick={() => applyTemplatePreset(demo, demo.id)}
+            >
+              {demo.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* 场景预置模板 */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, padding: "8px 12px", background: "var(--accent-soft)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-strong)", whiteSpace: "nowrap" }}>🎓 场景模板</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent-strong)", whiteSpace: "nowrap" }}>场景模板</span>
         <select
           style={{ flex: 1, fontSize: 12, padding: "4px 8px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--panel-strong)", color: "var(--ink)", cursor: "pointer" }}
           value={selectedScene}
           onChange={(event) => {
             const found = SCENE_TEMPLATES.find((t) => t.id === event.target.value);
             if (found) {
-              setTemplate((current) => ({ ...current, ...found.template }));
-              setSelectedScene(event.target.value);
+              applyTemplatePreset(found, event.target.value);
             }
           }}
         >
@@ -1573,7 +1655,7 @@ function TemplatePanel({
         <input
           type="text"
           value={runName}
-          placeholder="如：harness-attack 结果诊断"
+          placeholder="如：组会预演-单细胞结果诊断"
           onChange={(event) => setRunName(event.target.value)}
           style={{ fontSize: 13, padding: "6px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", background: "var(--panel-bg)" }}
         />
