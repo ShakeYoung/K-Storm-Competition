@@ -1171,7 +1171,7 @@ function App() {
       <header className="topbar">
         <div className="brand">
           <div className="brand-mark">
-            <img src="/favicon.svg" alt="K-Storm" style={{ width: 28, height: 28, display: "block" }} />
+            <span className="brand-initial" aria-hidden="true">K</span>
           </div>
           <div>
             <h1>K-Storm</h1>
@@ -2271,12 +2271,12 @@ function OverviewPage({ run, history, loading, onPageNavigate, onOpenRun }) {
             {recent.map((item) => (
               <button
                 key={item.run_id}
-                className="history-item"
+                className="history-item recent-history-item"
                 onClick={() => onOpenRun(item.run_id)}
                 style={{ cursor: "pointer" }}
               >
-                <span>{item.run_name || item.field}</span>
-                <small>{item.status} · {new Date(item.created_at).toLocaleString()}</small>
+                <span className="recent-history-title">{item.run_name || item.field}</span>
+                <small className="recent-history-meta">{item.status} · {new Date(item.created_at).toLocaleString()}</small>
               </button>
             ))}
           </div>
