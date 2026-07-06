@@ -34,10 +34,13 @@ fastapi_datas, fastapi_binaries, fastapi_hiddenimports = _drop_qt(_fa_d), _drop_
 _pd_d, _pd_b, _pd_h = collect_all("pydantic")
 pydantic_datas, pydantic_binaries, pydantic_hiddenimports = _drop_qt(_pd_d), _drop_qt(_pd_b), _drop_qt(_pd_h)
 
+_pdf_d, _pdf_b, _pdf_h = collect_all("pdfplumber")
+pdfplumber_datas, pdfplumber_binaries, pdfplumber_hiddenimports = _drop_qt(_pdf_d), _drop_qt(_pdf_b), _drop_qt(_pdf_h)
+
 a = Analysis(
     ["server_entry.py"],
     pathex=["."],
-    binaries=uvicorn_binaries + fastapi_binaries + pydantic_binaries,
+    binaries=uvicorn_binaries + fastapi_binaries + pydantic_binaries + pdfplumber_binaries,
     datas=[
         # Embed the built frontend
         ("app/static", "static"),
@@ -45,7 +48,7 @@ a = Analysis(
         ("app/prompts", "app/prompts"),
         # Include all app sub-packages as data so imports resolve in the bundle
         ("app", "app"),
-    ] + uvicorn_datas + fastapi_datas + pydantic_datas,
+    ] + uvicorn_datas + fastapi_datas + pydantic_datas + pdfplumber_datas,
     hiddenimports=[
         # uvicorn internals
         "uvicorn.logging",
@@ -72,16 +75,17 @@ a = Analysis(
         "app.model_providers.router",
         "app.schemas.models",
         "app.agents.registry",
-        "app.memory.engine",
         "app.memory.tfidf",
         "app.memory.extractor",
+        "pdfplumber",
+        "docx",
         # stdlib pieces that sometimes get missed
         "email.mime.text",
         "email.mime.multipart",
         "sqlite3",
         "multiprocessing.resource_tracker",
         "multiprocessing.popen_fork",
-    ] + uvicorn_hiddenimports + fastapi_hiddenimports + pydantic_hiddenimports,
+    ] + uvicorn_hiddenimports + fastapi_hiddenimports + pydantic_hiddenimports + pdfplumber_hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -90,7 +94,7 @@ a = Analysis(
         # "multiple Qt bindings" error when both are present in the env.
         "PyQt5", "PyQt6", "PySide2", "PySide6",
         # Other heavy packages not needed at runtime
-        "tkinter", "matplotlib", "numpy", "pandas", "PIL", "cv2",
+        "tkinter", "matplotlib", "numpy", "pandas", "cv2",
         "scipy", "sklearn", "tensorflow", "torch",
     ],
     noarchive=False,

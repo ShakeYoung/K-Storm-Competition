@@ -292,17 +292,19 @@ def validate_output_complete(text: str, kind: str) -> list[str]:
     if kind == "debate":
         if "### 给结构化 IR 的要点摘要" not in body:
             errors.append("缺少结构化 IR 摘要小节")
-        if "### 外部引用" not in body:
-            errors.append("缺少外部引用小节")
-        elif not _has_valid_reference_lines(body):
-            errors.append("外部引用小节缺少合法引用行")
         for key in ["关键主张", "支撑依据", "风险或反驳点", "建议进入 IR"]:
             if key not in body:
                 errors.append(f"IR 摘要缺少字段:{key}")
     elif kind == "moderator":
-        for key in ["冲突", "遗漏", "第 2 轮", "给结构化 IR 的要点摘要"]:
-            if key not in body:
-                errors.append(f"Moderator 输出缺少:{key}")
+        moderator_required = [
+            ("冲突", ["冲突", "分歧"]),
+            ("遗漏", ["遗漏", "缺失"]),
+            ("第 2 轮", ["第 2 轮", "第二轮"]),
+            ("给结构化 IR 的要点摘要", ["给结构化 IR 的要点摘要"]),
+        ]
+        for label, aliases in moderator_required:
+            if not any(alias in body for alias in aliases):
+                errors.append(f"Moderator 输出缺少:{label}")
     elif kind == "group_summary":
         if "```json" not in body.lower() and not body.lstrip().startswith("{"):
             errors.append("结构化 IR 缺少 JSON 块")
@@ -317,9 +319,16 @@ def validate_output_complete(text: str, kind: str) -> list[str]:
             if key not in body:
                 errors.append(f"最终报告缺少核心板块:{key}")
     elif kind == "critique":
-        for key in ["创新性风险", "证据链", "可行性", "逻辑一致性", "综合风险"]:
-            if key not in body:
-                errors.append(f"批判报告缺少维度:{key}")
+        critique_required = [
+            ("创新性风险", ["创新性风险", "创新风险"]),
+            ("证据链", ["证据链", "证据完整性", "证据强度"]),
+            ("可行性", ["可行性", "落地性", "执行风险"]),
+            ("逻辑一致性", ["逻辑一致性", "逻辑闭环", "逻辑风险"]),
+            ("综合风险", ["综合风险", "整体风险", "总风险"]),
+        ]
+        for label, aliases in critique_required:
+            if not any(alias in body for alias in aliases):
+                errors.append(f"批判报告缺少维度:{label}")
     elif kind == "citation_review":
         for key in ["引用相关性", "引用密度", "整体引用质量"]:
             if key not in body:
@@ -2277,7 +2286,7 @@ def moderator_prompt(
 2. 明显冲突或优先级分歧
 3. 候选方向聚类:把相似想法合并成 A/B/C/D 方向,并指出哪些只是换皮重复
 4. 每个候选方向的初步支持证据、最弱证据点、最大可行性风险
-5. 仍缺失的信息、关键变量或实验控制
+5. 遗漏/缺失的信息、关键变量或实验控制
 6. 第 2 轮每个 Agent 必须回应的具体问题
 7. 如果当前阶段不是"选题探索",必须优先围绕用户现有课题推进;只有在发现明显方向偏差时,才把转向建议放在最后。
 8. 末尾追加"### 给结构化 IR 的要点摘要",控制在 120-220 中文字,并明确列出候选方向、冲突点和待审查点。

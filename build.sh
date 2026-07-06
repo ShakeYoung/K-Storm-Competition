@@ -33,7 +33,7 @@ echo "▶ [3/4] Bundling backend (PyInstaller)…"
 cd "$BACKEND"
 
 # Install pyinstaller + runtime deps if not present
-pip3 install --quiet pyinstaller uvicorn fastapi pydantic python-multipart h11 httptools
+pip3 install --quiet pyinstaller uvicorn fastapi pydantic python-multipart pdfplumber python-docx h11 httptools
 
 pyinstaller k_storm.spec --clean --noconfirm
 echo "  ✓ backend/dist/k-storm-server ready"

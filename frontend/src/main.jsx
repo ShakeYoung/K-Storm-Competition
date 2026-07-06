@@ -917,8 +917,12 @@ function App() {
         const data = JSON.parse(event.data);
         if (data.error) {
           sse.close(); sseRef.current = null;
-          setLoading(false);
-          if (data.error !== "not_found") setError("连接异常，请刷新页面");
+          if (data.error === "not_found") {
+            setLoading(false);
+            setError("运行记录不存在，请返回历史记录重新打开。");
+          } else {
+            _startPolling(runId);
+          }
           return;
         }
         setRun(data);
