@@ -53,18 +53,6 @@ APP_VERSION = resolve_app_version()
 app = FastAPI(title="K-Storm API", version=APP_VERSION)
 
 KNOWN_MODEL_PRESETS = {
-    "ustc-107": [
-        {"id": "deepseek-v4-pro",          "name": "DeepSeek-V4-Pro（高阶）",      "model": "deepseek-v4-pro"},
-        {"id": "glm-5.2",                  "name": "GLM-5.2（高阶）",               "model": "glm-5.2"},
-        {"id": "deepseek-v4-flash",        "name": "DeepSeek-V4-Flash（通用）",    "model": "deepseek-v4-flash"},
-        {"id": "deepseek-v4-flash-ascend", "name": "DeepSeek-V4-Flash-Ascend",    "model": "deepseek-v4-flash-ascend"},
-        {"id": "qwen3.6-reasoner",         "name": "Qwen3.6-Reasoner（推理）",     "model": "qwen3.6-reasoner"},
-        {"id": "qwen3.6-chat",             "name": "Qwen3.6-Chat（通用）",         "model": "qwen3.6-chat"},
-        {"id": "qwen-reasoner",            "name": "Qwen-Reasoner",                "model": "qwen-reasoner"},
-        {"id": "qwen-chat",                "name": "Qwen-Chat",                    "model": "qwen-chat"},
-        {"id": "smart-default",            "name": "Smart/Default",                "model": "smart/default"},
-        {"id": "smart-reasoning",          "name": "Smart/Reasoning",              "model": "smart/reasoning"},
-    ],
     "kimi-coding": [
         {"id": "kimi-for-coding", "name": "kimi-for-coding", "model": "kimi-for-coding"},
     ],
