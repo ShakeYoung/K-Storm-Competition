@@ -209,14 +209,14 @@ const providerGroups = [
 ];
 
 const defaultModelSettings = {
-  version: 7,
+  version: 8,
   providers: [
     {
       id: "ustc-107",
       name: "中国科大 107 算力平台",
       category: "api",
       api_key: "",
-      base_url: "https://107.ustc.edu.cn/v1",
+      base_url: "https://api.llm.ustc.edu.cn/v1",
       api_type: "openai_compatible",
       allow_insecure_tls: false,
       models: [
@@ -350,31 +350,37 @@ function loadModelSettings() {
 function normalizeModelSettings(settings) {
   const defaults = JSON.parse(JSON.stringify(defaultModelSettings));
   const existing = settings.providers || [];
-  const existingIds = new Set(existing.map((item) => item.id));
-  const presetApiIds = new Set(
-    defaults.providers.map((item) => item.id),
-  );
+  const existingById = new Map(existing.map((item) => [item.id, item]));
+  const defaultIds = new Set(defaults.providers.map((item) => item.id));
   const resetPresetModels = settings.version !== defaults.version;
+  const cleanedCustomProviders = existing.filter(
+    (item) =>
+      !defaultIds.has(item.id) &&
+      item.id !== "chatgpt-plus" &&
+      item.api_type !== "chatgpt_codex" &&
+      (item.category || "api") !== "oauth",
+  );
   return {
     ...settings,
     version: defaults.version,
     providers: [
-      ...existing
-        .filter(
-          (item) =>
-            item.id !== "chatgpt-plus" &&
-            item.api_type !== "chatgpt_codex" &&
-            (item.category || "api") !== "oauth",
-        )
-        .map((item) => ({
-          category: "api",
+      ...defaults.providers.map((defaultProvider) => {
+        const item = existingById.get(defaultProvider.id);
+        if (!item) return defaultProvider;
+        return {
+          ...defaultProvider,
           ...item,
-          models:
-            resetPresetModels && presetApiIds.has(item.id)
-              ? []
-              : item.models || [],
-        })),
-      ...defaults.providers.filter((item) => !existingIds.has(item.id)),
+          category: item.category || defaultProvider.category || "api",
+          base_url: resetPresetModels ? defaultProvider.base_url : item.base_url || defaultProvider.base_url,
+          api_type: resetPresetModels ? defaultProvider.api_type : item.api_type || defaultProvider.api_type,
+          models: resetPresetModels ? defaultProvider.models || [] : item.models || defaultProvider.models || [],
+        };
+      }),
+      ...cleanedCustomProviders.map((item) => ({
+        category: "api",
+        ...item,
+        models: item.models || [],
+      })),
     ],
     assignments: settings.assignments || {},
   };
@@ -3673,19 +3679,23 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
                       </div>
                     ) : null}
                     {candidateModels.length ? (
-                  candidateModels.slice(0, 80).map((model) => (
-                    <button
-                      className="model-candidate"
-                      key={model.id}
-                      onClick={() => addModelFromCandidate(model)}
-                    >
-                      <span>{model.name || model.model || model.id}</span>
-                      <small>{model.context_window || ""}</small>
-                    </button>
-                  ))
-                ) : (
-                  <div className="empty-line">回车或点击“添加模型”添加输入的模型 ID。</div>
-                )}
+                      candidateModels.slice(0, 80).map((model) => (
+                        <button
+                          className="model-candidate"
+                          key={model.id}
+                          onClick={() => addModelFromCandidate(model)}
+                        >
+                          <span>{model.name || model.model || model.id}</span>
+                          <small>{model.context_window || ""}</small>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="empty-line">
+                        {discoveredModels[activeProvider?.id]?.length && !modelSearch
+                          ? "读取成功，候选模型已全部添加。可在下方 Agent 模型位置中选择，或点击“推荐配置”。"
+                          : "回车或点击“添加模型”添加输入的模型 ID。"}
+                      </div>
+                    )}
                   </>
                 )}
               </div>

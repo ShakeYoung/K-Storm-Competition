@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.model_providers.compatible import normalize_openai_base_url
 from app.model_providers.factory import get_model_provider
 from app.orchestrator.runner import cancel_run, create_run_record, execute_memory_query, execute_run_safe, get_stream_state, rerun, resume_run_safe
 from app.schemas.models import (
@@ -131,11 +132,10 @@ def discover_models(provider: UserModelProvider) -> dict[str, list[dict[str, str
     if not provider.api_key or not provider.base_url:
         raise HTTPException(status_code=400, detail="API Key 和 Base URL 不能为空")
 
-    base_url = provider.base_url.rstrip("/")
-    if base_url.endswith("/chat/completions"):
-        base_url = base_url[: -len("/chat/completions")]
-    if base_url.endswith("/responses"):
-        base_url = base_url[: -len("/responses")]
+    if provider.api_type in {"openai_compatible", "openai_responses"}:
+        base_url = normalize_openai_base_url(provider.base_url)
+    else:
+        base_url = provider.base_url.rstrip("/")
     if base_url.endswith("/messages"):
         base_url = base_url[: -len("/messages")]
     endpoint = f"{base_url}/models"

@@ -4,12 +4,30 @@ import json
 import socket
 import ssl
 import time
+import urllib.parse
 import urllib.error
 import urllib.request
 from collections.abc import Callable
 
 
 MAX_TRANSIENT_RETRIES = 3
+
+
+def normalize_openai_base_url(base_url: str) -> str:
+    """Normalize OpenAI-compatible roots to a /v1 API base.
+
+    Users often paste the platform root shown in docs. For OpenAI-compatible
+    providers, a bare origin should call /v1/chat/completions and /v1/models.
+    """
+    value = base_url.rstrip("/")
+    for suffix in ("/chat/completions", "/responses", "/models"):
+        if value.endswith(suffix):
+            value = value[: -len(suffix)]
+            break
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme and parsed.netloc and parsed.path in {"", "/"}:
+        return f"{value}/v1"
+    return value
 
 
 class OpenAICompatibleClient:
@@ -28,7 +46,7 @@ class OpenAICompatibleClient:
         if not model:
             raise RuntimeError("模型 ID 不能为空")
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = normalize_openai_base_url(base_url)
         self.model = model
         self.allow_insecure_tls = allow_insecure_tls
 
@@ -202,7 +220,7 @@ class OpenAIResponsesClient:
         if not model:
             raise RuntimeError("模型 ID 不能为空")
         self.api_key = api_key
-        self.base_url = base_url.rstrip("/")
+        self.base_url = normalize_openai_base_url(base_url)
         self.model = model
         self.allow_insecure_tls = allow_insecure_tls
 
