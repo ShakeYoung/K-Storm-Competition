@@ -464,6 +464,17 @@ a,
   color: var(--accent-strong);
 }
 
+/* 预置完整演示 run 的按钮：高亮强调，区别于"填模板"按钮 */
+.demo-case-button.demo-case-run {
+  background: linear-gradient(135deg, rgba(36,111,224,0.12), rgba(36,111,224,0.06));
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+.demo-case-button.demo-case-run:hover {
+  background: var(--accent-soft);
+  box-shadow: 0 2px 8px rgba(36,111,224,0.18);
+}
+
 textarea {
   background: var(--panel-strong);
   border: 1px solid var(--border);
@@ -724,6 +735,25 @@ select:focus {
   white-space: pre-wrap;
 }
 
+/* 因预算省略的关键点告警块 */
+.brief-block.omitted-notes {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+  border-left: 3px solid #f59e0b;
+}
+.brief-block.omitted-notes h3 {
+  color: #b45309;
+}
+.brief-block.omitted-notes ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+.brief-block.omitted-notes li {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.7;
+}
+
 .brief-block ul {
   color: var(--ink-soft);
   line-height: 1.55;
@@ -847,6 +877,61 @@ select:focus {
 .agent-card[data-agent="intake"]     { border-top-color: var(--accent); }
 .agent-card[data-agent="group_summarizer"] { border-top-color: #1565C0; }
 .agent-card[data-agent="output"]    { border-top-color: #6B4FB8; }
+
+/* 人工介入意见卡片：accent-soft 底色 + 虚线左边框，区别于 LLM 生成内容 */
+.agent-card.human-card {
+  background: linear-gradient(135deg, rgba(36,111,224,0.10), rgba(36,111,224,0.04));
+  border: 1px solid rgba(36,111,224,0.22);
+  border-left: 3px dashed var(--accent);
+  border-top-color: rgba(36,111,224,0.22);
+}
+.agent-card.human-card .agent-card-header strong { color: var(--accent-strong); }
+.agent-card.human-card .agent-card-header strong::before { content: "👤 "; }
+
+/* 人工介入输入条 */
+.human-interjection-bar {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  margin-top: 14px;
+  padding: 10px;
+  background: var(--accent-soft);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+}
+.human-interjection-input {
+  flex: 1;
+  min-height: 40px;
+  resize: vertical;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+.human-interjection-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(36,111,224,0.12);
+}
+.human-interjection-submit {
+  align-self: flex-end;
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  min-height: 40px;
+}
+.human-interjection-submit:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.human-interjection-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .agent-role-tag {
   display: inline-block;

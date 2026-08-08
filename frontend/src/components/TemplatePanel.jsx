@@ -13,6 +13,7 @@ function TemplatePanel({
   updateDocument,
   removeDocument,
   onSubmit,
+  onOpenRun,
   mode = "full",
   runName = "",
   setRunName,
@@ -26,6 +27,15 @@ function TemplatePanel({
     if (preset.runName && setRunName) {
       setRunName(preset.runName);
     }
+  }
+
+  function handleDemoClick(demo) {
+    // 预置演示 run：一键打开完整讨论结果（断网可用，零模型调用）
+    if (demo.runId && onOpenRun) {
+      onOpenRun(demo.runId);
+      return;
+    }
+    applyTemplatePreset(demo, demo.id);
   }
 
   return (
@@ -55,8 +65,9 @@ function TemplatePanel({
           {COMPETITION_DEMOS.map((demo) => (
             <button
               key={demo.id}
-              className="demo-case-button"
-              onClick={() => applyTemplatePreset(demo, demo.id)}
+              className={`demo-case-button${demo.runId ? " demo-case-run" : ""}`}
+              onClick={() => handleDemoClick(demo)}
+              title={demo.runId ? "一键打开预置完整演示（含讨论链/IR/批判/报告）" : "填入模板后启动讨论"}
             >
               {demo.label}
             </button>

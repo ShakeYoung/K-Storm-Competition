@@ -88,10 +88,27 @@ The detected stage is injected into every agent prompt as a **stage label + stag
 - 🧠 **TF-IDF cross-run memory search** — extracts 5-type MemoryEntries (directions / decisions / claims / critiques / opportunities) from all completed runs' StructuredIRV2; pure stdlib bigram TF-IDF cosine retrieval with type and field filters; accessible via the "跨 Run 知识检索" tab in Memory Query mode
 - 🔢 **Per-card character count** — each debate agent card shows a live character count badge (top-right), giving an at-a-glance sense of output length without opening the card
 - 🔎 **In-debate keyword search** — search bar inline with round tabs; filters cards to only those containing the keyword and highlights every match in yellow; shows a live match count; one-click clear
+- 🏁 **Competition demo mode** — 3 high-quality research scenarios (group-meeting rehearsal, result diagnosis, undergrad topic selection); one-click template fill + run naming
+- 🛡️ **Reference online verification** — one-click verification of cited references against arXiv / Crossref / OpenReview; outputs verified / mismatch / not_found / pending badges; degrades gracefully offline
+- 💬 **Human-in-the-loop interjection** — insert your opinion after any round; the next round's agents automatically carry it forward
+- 🎬 **One-click demo case** — a pre-run complete discussion (debate chain / IR / critique / report) seedable into a fresh DB; works offline with zero LLM calls
+- 💾 **History backup & migration** — export all runs to JSON and re-import on another machine
+
+## 🆚 K-Storm vs asking an LLM directly
+
+| Dimension | ChatGPT / DeepSeek (single shot) | K-Storm multi-agent deliberation |
+|:--|:--|:--|
+| **Perspectives** | Single model, single answer | 4 role-specialized agents + Moderator conflict summary + independent Critique |
+| **Reproducible** | Hard to trace | Structured IR: candidate directions bound to evidence + critiques + ranking rationale |
+| **Evidence** | Uncontrolled citations | Agents required to cite; online verification flags authenticity |
+| **Conflict handling** | Model self-harmonizes | Moderator explicitly surfaces conflicts, gaps, and next-round questions |
+| **Artifacts** | One Markdown blob | Report + IR + debate chain + reference list + critique report; export MD/PDF/ZIP |
+
+> A typical full deliberation: **10 agents · 3 rounds · ~15-20 LLM calls · a replayable structured decision chain.**
 
 ## 🏗️ Architecture
 
-K-Storm is organized as a local research orchestration system: the React console handles input, debate visualization, reports, and history; the FastAPI backend runs the state machine and routes each agent slot to its assigned model. Nine specialized agents collaborate across the pipeline:
+K-Storm is organized as a local research orchestration system: the React console handles input, debate visualization, reports, and history; the FastAPI backend runs the state machine and routes each agent slot to its assigned model. Ten specialized agents (4 debate + 6 orchestration/synthesis) collaborate across the pipeline:
 
 **Debate group** (each independently bound to a model)
 - **Novelty Agent** — proposes new directions and differentiating angles
@@ -270,12 +287,16 @@ POST   /api/runs/{run_id}/rerun           Rerun from scratch
 POST   /api/runs/{run_id}/resume          Resume a failed/canceled run
 POST   /api/runs/{run_id}/cancel          Cancel a running run
 POST   /api/runs/{run_id}/references      Extract or update external references
+POST   /api/runs/{run_id}/references/verify  Verify reference authenticity online (arXiv/Crossref/OpenReview)
+POST   /api/runs/{run_id}/interject       Human interjection: append user opinion to a round
 POST   /api/memory/query                  Memory query against a completed run
 POST   /api/runs/{run_id}/upgrade          Upgrade to a higher mode, carrying over context
-POST   /api/memory/search                 TF-IDF cross-run knowledge search
+POST   /api/memory/search                 TF-IDF cross-run knowledge search (with LLM query expansion)
 GET    /api/history                       List past runs
+GET    /api/history/export                Export all runs as JSON (backup)
+POST   /api/history/import                Import runs from JSON (migration/restore)
 POST   /api/history/delete                Delete selected runs
-POST   /api/models/discover               Discover available models from a provider
+POST   /api/models/discover               Discover available models from a provider (http(s) only)
 POST   /api/documents/extract             Extract text from uploaded PDF/DOCX/TXT
 ```
 

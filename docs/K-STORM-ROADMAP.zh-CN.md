@@ -661,20 +661,22 @@ K-Storm 后续最重要的进化方向，不是单纯扩张 agent 数量，而�
 |:--|:--|
 | 升级链路 | Quick Probe → Focused Panel → Full Deliberation，`upgrade_from_run_id` 落库并注入前序 brief/IR/Critique |
 | Critique Agent | 讨论结束后独立六维风险审查（创新性/证据链/可行性/一致性/偏见/下一步） |
-| Citation Review Agent | 引用线索一致性/完整性/相关性检查，A/B/C/D 评级，标注「需人工核实」（不接外部数据库） |
-| TF-IDF 跨 Run 记忆检索 | 从 StructuredIRV2/Brief 提取 5 类 MemoryEntry，字符 bigram + 余弦检索，类型与领域过滤 |
+| Citation Review Agent | 引用线索一致性/完整性/相关性检查，A/B/C/D 评级；注入在线核验结果供参考 |
+| **引用在线核验** | `app/verification/` 模块对 arXiv/Crossref/OpenReview 核验，输出 verified/mismatch/not_found/pending；离线降级 |
+| **人工介入讨论** | `POST /api/runs/{id}/interject` 追加用户意见，runner 每轮 DB 重拉使下一轮 Agent 自动携带 |
+| **演示案例包** | 真实 run 导出为 seed，startup 自动注入，前端「⚡ 一键演示」断网打开 |
+| TF-IDF 跨 Run 记忆检索 | 从 StructuredIRV2/Brief 提取 5 类 MemoryEntry，字符 bigram + 余弦检索；含 LLM 查询扩展（规则降级） |
 | 科研阶段感知 | 选题探索/方案收敛/结果诊断/转向评估 自动推断，注入 prompt 并影响报告结构 |
-| 大文档混合 intake | >12k 字符自动逐文档摘要 + 9000 字符预算 + 丢弃警告；表格类文档走确定性摘要 |
+| 大文档混合 intake | >12k 字符自动逐文档摘要 + 9000 字符预算 + 丢弃警告；输出「因预算省略的关键点」清单 |
 | USTC 107 预置 | 10 个模型 preset，前端「⚡ 一键配置」读取全部模型并生成推荐分配 |
 | 参赛演示模式 | 内置科研训练/组会预演/结果诊断 3 个案例 |
 | SSE 双通道 | 状态流（0.8s）+ token 逐字流（0.1s），连接断开检测，无固定超时 |
-| 稳定性收口 | 启动回收僵尸 run、resume 按模式路由、输出完整性校验 + 截断续写重试、34 个 pytest 测试 |
+| **历史备份与安全** | export/import 端点；`/api/models/discover` 限制 http(s) scheme 防 SSRF |
+| 稳定性收口 | 启动回收僵尸 run、resume 按模式路由、输出完整性校验 + 截断续写重试、61 个 pytest + 16 个 vitest |
 
 ### 后续路线（V2 剩余 / V3）
 
 - 本地文档 chunk 级检索与证据可追溯（V2 核心）
-- 引用真实性在线核验（Crossref / OpenAlex / arXiv，可选开关）
-- 人工介入讨论（human-in-the-loop）
 - 多 Run 对比视图（同模板 × 不同模型/轮次）
 - 小型评测集与 workflow eval（V3）
 - 桌面封装（Electron + PyInstaller）重新打包

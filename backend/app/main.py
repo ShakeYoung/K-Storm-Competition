@@ -23,6 +23,7 @@ from app.schemas.models import (
     DiscussionMode,
     HistoryDeleteRequest,
     HistoryItem,
+    InterjectRequest,
     MemoryQueryRequest,
     MemoryQueryResponse,
     MemorySearchRequest,
@@ -118,6 +119,9 @@ def startup() -> None:
     recovered = db.mark_stale_runs_failed()
     if recovered:
         logger.info("recovered %d stale runs from previous process (marked FAILED)", recovered)
+    seeded = db.seed_demo_runs()
+    if seeded:
+        logger.info("seeded %d demo runs for competition showcase", seeded)
 
 
 @app.get("/api/health")
@@ -134,6 +138,10 @@ def discover_models(provider: UserModelProvider) -> dict[str, list[dict[str, str
         raise HTTPException(status_code=400, detail=f"暂不支持读取该 API 类型：{provider.api_type}")
     if not provider.api_key or not provider.base_url:
         raise HTTPException(status_code=400, detail="API Key 和 Base URL 不能为空")
+    # 安全收口：拒绝非 http(s) scheme（防 SSRF，如 file:/// gopher:// 等）
+    lowered = provider.base_url.lower().strip()
+    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+        raise HTTPException(status_code=400, detail="Base URL 必须以 http:// 或 https:// 开头")
 
     if provider.api_type in {"openai_compatible", "openai_responses"}:
         base_url = normalize_openai_base_url(provider.base_url)
@@ -417,6 +425,34 @@ def resume_existing_run(run_id: str, payload: RunResumeRequest, background_tasks
     return updated
 
 
+@app.post("/api/runs/{run_id}/interject", response_model=RunRecord)
+def interject(run_id: str, payload: InterjectRequest) -> RunRecord:
+    """在指定轮次后追加一条人工意见（DebateMessage, is_human=True）。
+
+    运行中的 run：下一轮 agent 会通过 run_debate_round_serial 的 DB 重拉看到该意见。
+    已完成的 run：仅追加到历史，不影响已生成的报告（如需重新生成下游，用 resume）。
+    """
+    from app.schemas.models import DebateMessage
+    try:
+        source = db.get_run(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    # 防御：同一轮避免重复插入完全相同的人工意见（幂等）
+    new_msg = DebateMessage(
+        round=payload.round,
+        agent="你",
+        title=f"用户意见（第 {payload.round} 轮后）",
+        content=payload.content,
+        model_label="用户意见",
+        is_human=True,
+    )
+    messages = list(source.debate_messages or [])
+    if any(m.is_human and m.round == payload.round and m.content == payload.content for m in messages):
+        return source  # 已存在相同意见，幂等返回
+    messages.append(new_msg)
+    return db.update_run(run_id, debate_messages=messages)
+
+
 @app.post("/api/runs/{run_id}/references")
 def regenerate_references(run_id: str, payload: dict | None = Body(default=None)) -> RunRecord:
     try:
@@ -428,6 +464,30 @@ def regenerate_references(run_id: str, payload: dict | None = Body(default=None)
     existing = source.external_references if merge else None
     external_references = extract_references(source.debate_messages, existing)
     return db.update_run(run_id, external_references=external_references)
+
+
+@app.post("/api/runs/{run_id}/references/verify")
+def verify_references_endpoint(run_id: str, payload: dict | None = Body(default=None)) -> RunRecord:
+    """对 run 的外部引用执行在线核验（arXiv/Crossref/OpenReview），结果写回 verification 字段。"""
+    try:
+        source = db.get_run(run_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
+    from app.verification.verify import verify_references
+    refs = list(source.external_references or [])
+    if not refs:
+        raise HTTPException(status_code=400, detail="该 Run 暂无外部引用，请先提取引用")
+    sources_filter = (payload or {}).get("sources")
+    sources_list = sources_filter.split(",") if isinstance(sources_filter, str) else None
+    try:
+        verifications = verify_references(refs, sources=sources_list)
+    except Exception as exc:
+        logger.exception("reference verification failed for run %s: %s", run_id, exc)
+        raise HTTPException(status_code=502, detail=f"核验失败：{exc}") from exc
+    # 把核验结果回写到对应 ref 的 verification 字段
+    for ref, ver in zip(refs, verifications):
+        ref.verification = ver.model_dump()
+    return db.update_run(run_id, external_references=refs)
 
 
 @app.post("/api/documents/extract")
@@ -491,6 +551,83 @@ def history_location() -> dict[str, str]:
     return db.history_location()
 
 
+@app.get("/api/history/export")
+def export_history() -> dict:
+    """导出全部历史 run 为 JSON（含完整产物），供备份/迁移使用。"""
+    from app.storage import db as _db
+    history = _db.list_history(limit=500)
+    runs = []
+    for item in history:
+        try:
+            run = _db.get_run(item.run_id)
+            runs.append(json.loads(run.model_dump_json()))
+        except Exception:
+            continue
+    return {
+        "exported_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "version": APP_VERSION,
+        "count": len(runs),
+        "runs": runs,
+    }
+
+
+@app.post("/api/history/import")
+def import_history(payload: dict = Body(...)) -> dict:
+    """从 JSON 导入历史 run（用于换机迁移/恢复）。已存在的 run_id 跳过。"""
+    from app.storage import db as _db
+    from app.schemas.models import (
+        AgentModelSettings,
+        ExternalReference,
+        RunRecord,
+        StructuredBrief,
+        StructuredIRV2,
+        TemplateInput,
+    )
+    runs_data = payload.get("runs") or []
+    imported = 0
+    skipped = 0
+    for data in runs_data:
+        run_id = data.get("run_id")
+        if not run_id:
+            continue
+        try:
+            _db.get_run(run_id)
+            skipped += 1
+            continue
+        except KeyError:
+            pass
+        try:
+            template = TemplateInput.model_validate(data["template_input"])
+            _db.create_run(
+                run_id,
+                template,
+                model_settings=AgentModelSettings.model_validate(data.get("model_settings") or {}),
+                rounds=data.get("rounds", 3),
+                parallel_first_round=bool(data.get("parallel_first_round", False)),
+                mode=data.get("mode", "full"),
+                research_stage=data.get("research_stage", "auto"),
+                run_name=data.get("run_name", ""),
+            )
+            update_kwargs = {
+                "status": data.get("status", "COMPLETED"),
+                "final_report": data.get("final_report", ""),
+                "group_summary": data.get("group_summary", ""),
+                "critique_report": data.get("critique_report", ""),
+                "citation_review": data.get("citation_review", ""),
+                "debate_messages": data.get("debate_messages", []),
+                "external_references": [ExternalReference.model_validate(r) for r in data.get("external_references", [])],
+            }
+            if data.get("structured_brief"):
+                update_kwargs["structured_brief"] = StructuredBrief.model_validate(data["structured_brief"])
+            if data.get("structured_ir"):
+                update_kwargs["structured_ir"] = StructuredIRV2.model_validate(data["structured_ir"])
+            _db.update_run(run_id, **update_kwargs)
+            imported += 1
+        except Exception:
+            continue
+    return {"imported": imported, "skipped": skipped}
+
+
 @app.post("/api/history/delete")
 def delete_history(payload: HistoryDeleteRequest) -> dict[str, int]:
     return {"deleted": db.delete_runs(payload.run_ids)}
@@ -498,9 +635,12 @@ def delete_history(payload: HistoryDeleteRequest) -> dict[str, int]:
 
 @app.post("/api/memory/search", response_model=MemorySearchResponse)
 def memory_search(payload: MemorySearchRequest) -> MemorySearchResponse:
-    """跨 Run TF-IDF 知识检索：从所有已完成的 Run 的 StructuredIRV2 中检索相关知识单元。"""
+    """跨 Run TF-IDF 知识检索：从所有已完成的 Run 的 StructuredIRV2 中检索相关知识单元。
+    支持可选的 LLM 查询扩展（默认开启），把原问题扩成同义检索词提升语义召回。
+    """
     from app.memory.extractor import extract_memory_entries
     from app.memory.tfidf import search as tfidf_search
+    from app.memory.query_expander import expand_query
 
     # 加载所有已完成 Run（最多 200 条，按更新时间倒序）
     history = db.list_history(limit=200)
@@ -514,18 +654,32 @@ def memory_search(payload: MemorySearchRequest) -> MemorySearchResponse:
         except Exception:
             continue
 
-    hits = tfidf_search(
-        query=payload.question,
-        entries=all_entries,
-        top_k=payload.top_k,
-        field_filter=payload.field_filter,
-        entry_types=payload.entry_types if payload.entry_types else None,
-    )
+    # 查询扩展：把原问题扩成同义检索词（mock/离线自动降级为规则扩展）
+    expanded = expand_query(payload.question, provider=None)
+    all_queries = [payload.question] + expanded
+
+    # 对每个 query 检索，合并结果按 entry_id 去重，分数取最大值
+    merged: dict[str, dict] = {}
+    for q in all_queries:
+        hits = tfidf_search(
+            query=q,
+            entries=all_entries,
+            top_k=payload.top_k * 2 if len(all_queries) > 1 else payload.top_k,
+            field_filter=payload.field_filter,
+            entry_types=payload.entry_types if payload.entry_types else None,
+        )
+        for hit in hits:
+            eid = hit.entry.entry_id
+            if eid not in merged or hit.score > merged[eid]["score"]:
+                merged[eid] = {"hit": hit, "score": hit.score}
+
+    hits = [v["hit"] for v in sorted(merged.values(), key=lambda x: x["score"], reverse=True)][:payload.top_k]
 
     return MemorySearchResponse(
         hits=hits,
         total_entries_indexed=len(all_entries),
         total_runs_searched=len(completed_ids),
+        expanded_queries=expanded,
     )
 
 

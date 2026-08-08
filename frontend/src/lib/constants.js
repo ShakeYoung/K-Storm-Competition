@@ -85,6 +85,17 @@ export const SCENE_TEMPLATES = [
 
 export const COMPETITION_DEMOS = [
   {
+    id: "demo-llm-security",
+    label: "⚡ 一键演示：LLM 安全诊断（完整 run）",
+    runId: "demo_llm_security",
+    runName: "[演示] LLM 安全 · harness attack 机制诊断",
+    template: {
+      field: "大语言模型安全、prompt injection、agent harness security",
+      background: "演示案例：已预跑完成的完整讨论（含 13 条 Agent 发言、结构化 IR、六维批判审查、28 条外部引用与最终报告），无需模型调用，点击即展示。",
+      existing_basis: "预置演示 run，断网可用。",
+    },
+  },
+  {
     id: "demo-group-meeting-ai",
     label: "组会预演：多模态科研助手",
     runName: "参赛演示-组会预演-多模态科研助手",

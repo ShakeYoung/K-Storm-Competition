@@ -126,6 +126,43 @@ def test_unknown_run_returns_404(client):
     assert client.get("/api/runs/ks_does_not_exist").status_code == 404
 
 
+def test_verify_references_endpoint_writes_verification(client, monkeypatch):
+    """verify 端点把核验结果写回 external_references.verification 字段。"""
+    from app.schemas.models import ExternalReference
+    from app.verification.schemas import ReferenceVerification
+
+    run_id = _create_run(client)
+    # 直接给 run 灌一条带 arXiv URL 的引用
+    from app.storage import db
+    db.update_run(run_id, external_references=[
+        ExternalReference(id="REF-1", source_type="paper", title="Test Paper",
+                          url="https://arxiv.org/abs/1706.03762", authors="Vaswani"),
+    ])
+
+    # mock 核验器避免真实网络（端点侧集成，核验逻辑由 test_verification 覆盖）
+    def fake_verify(refs, sources=None):
+        return [ReferenceVerification(status="verified", source="arxiv", matched_title="Test Paper")]
+    monkeypatch.setattr("app.verification.verify.verify_references", fake_verify)
+
+    response = client.post(f"/api/runs/{run_id}/references/verify", json={})
+    assert response.status_code == 200, response.text
+    refs = response.json()["external_references"]
+    assert refs[0]["verification"]["status"] == "verified"
+    assert refs[0]["verification"]["source"] == "arxiv"
+
+
+def test_verify_references_empty_returns_400(client):
+    # 创建一条 quick probe run（mock 不产生"### 外部引用"小节 → external_references 为空）
+    payload = {**RUN_PAYLOAD, "mode": "quick", "probe_agent": "reviewer", "probe_question": "测试", "run_name": "空引用 run"}
+    response = client.post("/api/runs", json=payload)
+    run_id = response.json()["run_id"]
+    # 确保无引用（quick probe 不提取引用）
+    from app.storage import db
+    db.update_run(run_id, external_references=[])
+    verify_resp = client.post(f"/api/runs/{run_id}/references/verify", json={})
+    assert verify_resp.status_code == 400
+
+
 def test_stale_running_runs_recovered_on_startup(client):
     run_id = _create_run(client)
     # 模拟进程崩溃：run 停留在进行中状态
@@ -139,6 +176,34 @@ def test_stale_running_runs_recovered_on_startup(client):
     assert "服务重启中断" in run.error
     # 二次调用幂等
     assert db.mark_stale_runs_failed() == 0
+
+
+def test_history_export_import_roundtrip(client):
+    """导出 → 清库 → 导入，验证 run 可恢复。"""
+    run_id = _create_run(client)
+    # 导出
+    resp = client.get("/api/history/export")
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["count"] >= 1
+    assert any(r["run_id"] == run_id for r in payload["runs"])
+
+    # 导入到已有库（幂等跳过）
+    import_resp = client.post("/api/history/import", json=payload)
+    assert import_resp.status_code == 200
+    assert import_resp.json()["skipped"] >= 1  # 已存在则跳过
+
+
+def test_discover_rejects_non_http_scheme(client):
+    """安全：file:// / gopher:// 等 scheme 应被拒绝。"""
+    from app.schemas.models import UserModelProvider
+    provider = UserModelProvider(
+        id="evil", name="evil", api_key="k",
+        base_url="file:///etc/passwd", api_type="openai_compatible",
+    )
+    resp = client.post("/api/models/discover", json=provider.model_dump())
+    assert resp.status_code == 400
+    assert "http" in resp.json()["detail"]
 
 
 def teardown_module():

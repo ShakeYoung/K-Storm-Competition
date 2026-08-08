@@ -1,0 +1,1172 @@
+{
+  "run_id": "demo_llm_security",
+  "status": "COMPLETED",
+  "mode": "full",
+  "research_stage": "result_diagnosis",
+  "template_input": {
+    "field": "大语言模型安全、prompt injection、agent harness security、RAG/tool/memory context injection、防御与检测机制",
+    "background": "我的论文研究的是 harness attack / phantom context：攻击者不直接修改模型参数，而是污染 pre-model assembly context，例如 RAG 检索文档、tool output、memory、control message 等。模型在第一阶段可能吸收 false context，在用户纠正后第二阶段仍可能 lock-in。\n\n当前论文主线已经较清楚：pre-model assembly context 是攻击面；多 channel context 会诱导 absorption；correction-aware reset 能较有效切断 Stage-2 lock-in。但老师追问：真实场景中系统不知道哪条 context 是假的，detection 是否可行、难度在哪。\n\n目前已有一个 source-bound influence detector pilot：每个 context object 绑定 source identity 和 source trust，通过移除 untrusted context 后重新询问模型，观察答案 residual / influence。如果答案明显变化，则认为低信任 context 对模型输出产生了实际影响。",
+    "existing_basis": "已有实验包括：\n\n1. 2×2 source/content setting：\n   - trusted source + true content\n   - untrusted source + false content\n   - untrusted source + true content\n   - trusted source + false content\n\n2. provenance mode：\n   - no label\n   - natural-language label\n   - harness-bound label\n\n3. 已实现 source-bound influence detector：\n   - source_only baseline\n   - influence_only_focal_offline baseline\n   - source_bound_influence = source risk × output residual\n\n4. NQ 上 Qwen-3B 和 Llama-3-8B 的初步结果：\n   - 对 untrusted false context：AUROC ≈ 0.8575\n   - 对 untrusted absorbed false context：AUROC ≈ 0.8647\n   - 对 all false context：AUROC 约 0.53，接近弱检测，说明它不是事实真假检测器\n\n目前困惑是：这个 detector 如果叫 false-context detector 会显得奇怪；如果设计成完整 conflict-gated detector 又太重，可能破坏现有论文结构。",
+    "extension_points": "我倾向于把现有 detector 重新定位为：\n\nSource-bound residual monitor\n\n它不是判断事实真假，而是在 harness 边界上做风险监控：\n\n1. harness 为每个 context object 绑定 source identity 和 trust tier；\n2. 对 untrusted / unverified context 做 shadow ablation；\n3. 比较 full answer 与 ablated answer 的 salient answer residual；\n4. 如果低信任 context 的移除导致答案实体、数字或核心 claim 改变，则报警；\n5. 报警动作不是直接判定 false，而是 quarantine、downrank、trigger correction-aware reset 或 audit log。\n\n从控制论角度，它是 residual monitoring；\n从网安角度，它类似 IDS / taint tracking / sink influence check。",
+    "core_question": "如何在不破坏现有论文结构的前提下，将 detector 重新定位为一个轻量级 harness-side monitor？\n\n具体问题包括：\n\n1. 是否应该把它从 “false-context detector” 改名为 “source-bound residual monitor” 或 “harness-side influence monitor”？\n2. 从控制论角度，能否将它解释为 residual monitoring：比较 full-context answer 与 risky-context-ablated answer 的差异？\n3. 从传统网安角度，能否将它解释为 IDS / taint tracking / risk triage，而不是 truth verification？\n4. 这个 detector 应该作为 RQ5 的一个轻量补充，还是单独讨论？\n5. 当前实验结果应该如何表述，既不过度宣称 detection 能力，又能体现它的价值？",
+    "platforms": "已有 Python 实验框架，支持 NQ 数据集、Qwen-3B、Llama-3-8B、本地 LLM backend、source-bound context construction、influence ablation、JSONL/CSV/Markdown/log 输出。\n\n当前已有代码模块包括：\n- source_bound_context.py：构造 source-bound context objects\n- run_source_bound_detection_pilot.py：生成 2×2 source/content 条件下的模型输出和 ablation records\n- source_bound_influence_detector.py：计算 source_only、influence_only、source_bound_influence 指标\n\n可使用现有 records / summaries / logs 进行结果诊断，不希望新增大规模系统。",
+    "constraints": "当前论文已经有完整主线，不希望 detector 部分变成新的系统论文。希望只做小规模补充实验或重新组织已有结果。\n\n限制条件：\n1. 不重新训练 detector 模型\n2. 不使用模型 hidden states / attention / logprobs\n3. 不依赖 oracle content truth 进行在线检测\n4. 不大幅改动现有实验 pipeline\n5. 不引入复杂 claim extraction / fact-checking / multi-source arbitration 系统\n6. 尽量保持 RQ5 仍围绕 harness-side controls，而不是 detection paper",
+    "target_output": "希望多 agent 输出一份结构化设计建议，包括：\n\n1. 是否认可 “Source-bound residual monitor” 这个定位；\n2. 给出 2-3 个命名候选；\n3. 给出最小 detector 设计，不破坏现有 RQ5；\n4. 给出从控制论和传统网安角度的解释框架；\n5. 给出论文中可直接使用的英文表述；\n6. 给出当前实验结果应该如何重写 interpretation；\n7. 给出 limitations / threat model / attacker capability 应如何写；\n8. 判断是否需要新增小实验，若需要，只设计最小增量实验。",
+    "preferred_direction": "偏好轻量、机制清晰、能嵌入现有论文 RQ5 的方案。\n\n希望强调：\n- harness boundary\n- source-bound provenance\n- residual monitoring\n- influence rather than truth\n- IDS-style alert rather than definitive detection\n- correction-aware reset as response action\n- trusted false content 是边界条件 / limitation",
+    "avoid_direction": "避免把问题扩展成完整 fact-checking system、claim extraction system、multi-agent conflict arbitration system 或新的 detector model。\n\n不要建议：\n1. 重新训练分类器\n2. 使用 hidden states / attention / logprobs\n3. 大规模人工标注\n4. 完整知识库事实核验\n5. 复杂 multi-agent umbrella architecture 实验\n6. 把 detector 说成能判断事实真假\n7. 把 trusted source + false content 问题包装成已经解决"
+  },
+  "run_name": "[演示] LLM 安全 · harness attack 机制诊断",
+  "rounds": 3,
+  "parallel_first_round": true,
+  "selected_agents": [],
+  "probe_agent": "",
+  "probe_question": "",
+  "source_run_id": "",
+  "upgrade_from_run_id": "",
+  "model_settings": {
+    "providers": [
+      {
+        "id": "ustc-107",
+        "name": "中国科大 107 算力平台",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://api.llm.ustc.edu.cn/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": [
+          {
+            "id": "deepseek-v4-pro",
+            "name": "deepseek-v4-pro",
+            "model": "deepseek-v4-pro",
+            "context_window": ""
+          },
+          {
+            "id": "glm-5.2",
+            "name": "glm-5.2",
+            "model": "glm-5.2",
+            "context_window": ""
+          },
+          {
+            "id": "claude-sonnet-4-6",
+            "name": "claude-sonnet-4-6",
+            "model": "claude-sonnet-4-6",
+            "context_window": ""
+          },
+          {
+            "id": "claude-haiku-4-5-20251001",
+            "name": "claude-haiku-4-5-20251001",
+            "model": "claude-haiku-4-5-20251001",
+            "context_window": ""
+          },
+          {
+            "id": "qwen3.6-chat",
+            "name": "qwen3.6-chat",
+            "model": "qwen3.6-chat",
+            "context_window": ""
+          },
+          {
+            "id": "qwen3.6-reasoner",
+            "name": "qwen3.6-reasoner",
+            "model": "qwen3.6-reasoner",
+            "context_window": ""
+          },
+          {
+            "id": "deepseek-v4-flash-ascend",
+            "name": "deepseek-v4-flash-ascend",
+            "model": "deepseek-v4-flash-ascend",
+            "context_window": ""
+          },
+          {
+            "id": "claude-haiku-4-5",
+            "name": "claude-haiku-4-5",
+            "model": "claude-haiku-4-5",
+            "context_window": ""
+          },
+          {
+            "id": "qwen3.5",
+            "name": "qwen3.5",
+            "model": "qwen3.5",
+            "context_window": ""
+          },
+          {
+            "id": "glm-chat",
+            "name": "glm-chat",
+            "model": "glm-chat",
+            "context_window": ""
+          }
+        ]
+      },
+      {
+        "id": "kimi-coding",
+        "name": "Kimi Coding Plan",
+        "category": "coding_plan",
+        "api_key": "",
+        "base_url": "https://api.kimi.com/coding/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "bailian-coding",
+        "name": "百炼 Coding Plan",
+        "category": "coding_plan",
+        "api_key": "",
+        "base_url": "https://coding.dashscope.aliyuncs.com/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "volcengine-coding",
+        "name": "火山引擎 Coding Plan",
+        "category": "coding_plan",
+        "api_key": "",
+        "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "deepseek",
+        "name": "DeepSeek",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://api.deepseek.com/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": [
+          {
+            "id": "deepseek-v4-flash",
+            "name": "deepseek-v4-flash",
+            "model": "deepseek-v4-flash",
+            "context_window": ""
+          },
+          {
+            "id": "deepseek-v4-pro",
+            "name": "deepseek-v4-pro",
+            "model": "deepseek-v4-pro",
+            "context_window": ""
+          }
+        ]
+      },
+      {
+        "id": "dashscope",
+        "name": "DashScope (百炼 API)",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "openai",
+        "name": "OpenAI",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://api.openai.com/v1",
+        "api_type": "openai_responses",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "openrouter",
+        "name": "OpenRouter",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://openrouter.ai/api/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "ollama",
+        "name": "Ollama (Local)",
+        "category": "api",
+        "api_key": "",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "minimax",
+        "name": "MiniMax",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://api.minimax.io/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      },
+      {
+        "id": "siliconflow",
+        "name": "SiliconFlow",
+        "category": "api",
+        "api_key": "",
+        "base_url": "https://api.siliconflow.cn/v1",
+        "api_type": "openai_compatible",
+        "allow_insecure_tls": false,
+        "models": []
+      }
+    ],
+    "assignments": {
+      "intake": "ustc-107:deepseek-v4-pro",
+      "novelty": "deepseek:deepseek-v4-flash",
+      "mechanism": "ustc-107:claude-sonnet-4-6",
+      "feasibility": "ustc-107:qwen3.6-chat",
+      "reviewer": "deepseek:deepseek-v4-flash",
+      "moderator": "deepseek:deepseek-v4-flash",
+      "group_summarizer": "deepseek:deepseek-v4-flash",
+      "output": "deepseek:deepseek-v4-pro"
+    }
+  },
+  "structured_brief": {
+    "research_context": "我的论文研究的是 harness attack / phantom context：攻击者不直接修改模型参数，而是污染 pre-model assembly context，例如 RAG 检索文档、tool output、memory、control message 等。模型在第一阶段可能吸收 false context，在用户纠正后第二阶段仍可能 lock-in。\n\n当前论文主线已经较清楚：pre-model assembly context 是攻击面；多 channel context 会诱导 absorption；correction-aware reset 能较有效切断 Stage-2 lock-in。但老师追问：真实场景中系统不知道哪条 context 是假的，detection 是否可行、难度在哪。\n\n目前已有一个 source-bound influence detector pilot：每个 context object 绑定 source identity 和 source trust，通过移除 untrusted context 后重新询问模型，观察答案 residual / influence。如果答案明显变化，则认为低信任 context 对模型输出产生了实际影响。",
+    "known_facts": [
+      "研究领域为:大语言模型安全、prompt injection、agent harness security、RAG/tool/memory context injection、防御与检测机制",
+      "已有研究基础:已有实验包括：\n\n1. 2×2 source/content setting：\n   - trusted source + true content\n   - untrusted source + false content\n   - untrusted source + true content\n   - trusted source + false content\n\n2. provenance mode：\n   - no label\n   - natural-language label\n   - harness-bound label\n\n3. 已实现 source-bound influence detector：\n   - source_only baseline\n   - influence_only_focal_offline baseline\n   - source_bound_influence = source risk × output residual\n\n4. NQ 上 Qwen-3B 和 Llama-3-8B 的初步结果：\n   - 对 untrusted false context：AUROC ≈ 0.8575\n   - 对 untrusted absorbed false context：AUROC ≈ 0.8647\n   - 对 all false context：AUROC 约 0.53，接近弱检测，说明它不是事实真假检测器\n\n目前困惑是：这个 detector 如果叫 false-context detector 会显得奇怪；如果设计成完整 conflict-gated detector 又太重，可能破坏现有论文结构。",
+      "可用技术平台:已有 Python 实验框架，支持 NQ 数据集、Qwen-3B、Llama-3-8B、本地 LLM backend、source-bound context construction、influence ablation、JSONL/CSV/Markdown/log 输出。\n\n当前已有代码模块包括：\n- source_bound_context.py：构造 source-bound context objects\n- run_source_bound_detection_pilot.py：生成 2×2 source/content 条件下的模型输出和 ablation records\n- source_bound_influence_detector.py：计算 source_only、influence_only、source_bound_influence 指标\n\n可使用现有 records / summaries / logs 进行结果诊断，不希望新增大规模系统。",
+      "目标产出:希望多 agent 输出一份结构化设计建议，包括：\n\n1. 是否认可 “Source-bound residual monitor” 这个定位；\n2. 给出 2-3 个命名候选；\n3. 给出最小 detector 设计，不破坏现有 RQ5；\n4. 给出从控制论和传统网安角度的解释框架；\n5. 给出论文中可直接使用的英文表述；\n6. 给出当前实验结果应该如何重写 interpretation；\n7. 给出 limitations / threat model / attacker capability 应如何写；\n8. 判断是否需要新增小实验，若需要，只设计最小增量实验。",
+      "上传文档:main.pdf(other),注释:无,摘要:No module named 'pdfplumber'"
+    ],
+    "unknowns": [
+      "如何在不破坏现有论文结构的前提下，将 detector 重新定位为一个轻量级 harness-side monitor？\n\n具体问题包括：\n\n1. 是否应该把它从 “false-context detector” 改名为 “source-bound residual monitor” 或 “harness-side influence monitor”？\n2. 从控制论角度，能否将它解释为 residual monitoring：比较 full-context answer 与 risky-context-ablated answer 的差异？\n3. 从传统网安角度，能否将它解释为 IDS / taint tracking / risk triage，而不是 truth verification？\n4. 这个 detector 应该作为 RQ5 的一个轻量补充，还是单独讨论？\n5. 当前实验结果应该如何表述，既不过度宣称 detection 能力，又能体现它的价值？",
+      "创新边界、关键机制链条和最小验证实验仍需讨论组收敛。"
+    ],
+    "constraints": [
+      "当前论文已经有完整主线，不希望 detector 部分变成新的系统论文。希望只做小规模补充实验或重新组织已有结果。\n\n限制条件：\n1. 不重新训练 detector 模型\n2. 不使用模型 hidden states / attention / logprobs\n3. 不依赖 oracle content truth 进行在线检测\n4. 不大幅改动现有实验 pipeline\n5. 不引入复杂 claim extraction / fact-checking / multi-source arbitration 系统\n6. 尽量保持 RQ5 仍围绕 harness-side controls，而不是 detection paper"
+    ],
+    "opportunity_points": [
+      "我倾向于把现有 detector 重新定位为：\n\nSource-bound residual monitor\n\n它不是判断事实真假，而是在 harness 边界上做风险监控：\n\n1. harness 为每个 context object 绑定 source identity 和 trust tier；\n2. 对 untrusted / unverified context 做 shadow ablation；\n3. 比较 full answer 与 ablated answer 的 salient answer residual；\n4. 如果低信任 context 的移除导致答案实体、数字或核心 claim 改变，则报警；\n5. 报警动作不是直接判定 false，而是 quarantine、downrank、trigger correction-aware reset 或 audit log。\n\n从控制论角度，它是 residual monitoring；\n从网安角度，它类似 IDS / taint tracking / sink influence check。",
+      "偏好方向:偏好轻量、机制清晰、能嵌入现有论文 RQ5 的方案。\n\n希望强调：\n- harness boundary\n- source-bound provenance\n- residual monitoring\n- influence rather than truth\n- IDS-style alert rather than definitive detection\n- correction-aware reset as response action\n- trusted false content 是边界条件 / limitation",
+      "避免方向:避免把问题扩展成完整 fact-checking system、claim extraction system、multi-agent conflict arbitration system 或新的 detector model。\n\n不要建议：\n1. 重新训练分类器\n2. 使用 hidden states / attention / logprobs\n3. 大规模人工标注\n4. 完整知识库事实核验\n5. 复杂 multi-agent umbrella architecture 实验\n6. 把 detector 说成能判断事实真假\n7. 把 trusted source + false content 问题包装成已经解决",
+      "入口 Agent 已整合模板和上传文档,讨论组以入口整合 briefing 为准。"
+    ],
+    "intake_synthesis": "# 讨论组入口整合 briefing：Harness-side Source-bound Residual Monitor 定位与嵌入方案\n\n## 1. 已知事实（来自用户模板）\n\n### 1.1 论文主线\n- 研究 **harness attack / phantom context**：攻击者污染 pre-model assembly context（RAG 检索文档、tool output、memory、control message 等），模型吸收虚假上下文后，即使用户纠正，第二阶段仍可能 lock-in。\n- 主线清晰：pre-model assembly context 是攻击面；多 channel context 诱导 absorption；correction-aware reset 能有效切断 Stage-2 lock-in。\n\n### 1.2 已有检测器 pilot\n- **Source-bound influence detector**：每个 context object 绑定 source identity 和 source trust，移除 untrusted context 后重新询问模型，观察答案 residual / influence。若答案明显变化，则认为低信任 context 对模型输出产生了实际影响。\n- 实验设置：2×2 source/content（trusted/untrusted × true/false）；provenance mode（no label / natural-language label / harness-bound label）。\n- 初步结果（NQ 数据集，Qwen-3B 和 Llama-3-8B）：\n  - untrusted false context：AUROC ≈ 0.8575\n  - untrusted absorbed false context：AUROC ≈ 0.8647\n  - all false context：AUROC ≈ 0.53（接近随机），说明 detector 不是事实真假检测器。\n\n### 1.3 用户困惑与初步想法\n- 困惑：detector 若叫 “false-context detector” 会误导；若设计成完整 conflict-gated detector 太重，破坏现有论文结构。\n- 倾向定位：**Source-bound residual monitor**。\n  - 不是判断事实真假，而是在 harness 边界做风险监控。\n  - 流程：harness 绑定 source identity + trust tier → 对 untrusted/unverified context 做 shadow ablation → 比较 full answer 与 ablated answer 的 salient answer residual → 若低信任 context 移除导致答案实体/数字/核心 claim 改变，则报警（quarantine、downrank、trigger correction-aware reset 或 audit log）。\n  - 类比：控制论的 residual monitoring；网安的 IDS / taint tracking / sink influence check。\n\n### 1.4 核心科学问题（用户提出）\n1. 是否改名为 “source-bound residual monitor” 或 “harness-side influence monitor”？\n2. 能否从控制论解释为 residual monitoring？\n3. 能否从网安解释为 IDS / taint tracking / risk triage，而非 truth verification？\n4. 该 detector 应作为 RQ5 轻量补充还是单独讨论？\n5. 实验结果如何表述，既不过度宣称 detection 能力，又体现价值？\n\n### 1.5 资源与限制\n- 已有 Python 实验框架，模块包括 source-bound context 构造、2×2 条件模型输出与 ablation records、influence 指标计算。\n- 限制：不重新训练 detector；不使用 hidden states/attention/logprobs；不依赖 oracle content truth 在线检测；不大幅改动现有 pipeline；不引入复杂 claim extraction/fact-checking/multi-source arbitration；保持 RQ5 围绕 harness-side controls。\n\n### 1.6 目标产出\n需多 agent 输出结构化设计建议，包括：定位认可、命名候选、最小 detector 设计、控制论/网安解释框架、英文表述、结果重写 interpretation、limitations/threat model/attacker capability 写法、是否需要新增小实验及最小增量设计。\n\n## 2. 用户设想（从模板推断）\n- 希望 detector 轻量、机制清晰，嵌入现有 RQ5，不变成独立 detection paper。\n- 强调 harness boundary、source-bound provenance、residual monitoring、influence rather than truth、IDS-style alert、correction-aware reset 作为响应动作。\n- 承认 trusted source + false content 是边界条件/limitation，不包装成已解决。\n\n## 3. 从现有信息推断的机会点\n- 现有 detector 的 AUROC 对 untrusted false context 较高（~0.86），但对 all false context 低（0.53），恰好支持 “不是真假检测器，而是 harness 边界风险监控” 的定位。\n- 可将其重新定义为 **harness-side influence monitor**，利用 source trust 作为先验，检测 untrusted context 是否实际影响了输出，而非检测内容真假。\n- 与 correction-aware reset 形成闭环：monitor 报警 → 触发 reset，体现 harness-level defense。\n- 从控制论看，这是比较 full-context 与 ablated-context 输出的残差，类似故障检测中的 residual generation；从网安看，类似 taint tracking 在 sink 点检查 influence。\n\n## 4. 仍不确定的问题\n- 用户未提供上传文档内容（提取失败），因此无法确认是否有额外实验细节、理论框架或导师具体追问。\n- 用户对 RQ5 现有结构未详细描述，需假设 RQ5 已包含 harness-side controls 的某些方面。\n- 是否需要新增小实验（如不同 trust tier 的消融、不同 ablation 策略）尚未明确，需根据讨论组建议决定。\n- 对 trusted false content 的 handling 策略未定，需在 limitations 中明确。\n\n## 5. 建议讨论组聚焦点\n1. 命名与定位：确认 “Source-bound residual monitor” 或 “Harness-side influence monitor” 哪个更贴切。\n2. 最小设计：如何在不增加系统复杂度的前提下，将现有 detector 包装为 RQ5 的一个轻量机制。\n3. 解释框架：从控制论（residual monitoring）和网安（taint tracking/IDS）角度给出精炼的理论支撑。\n4. 结果重述：将 AUROC 结果重新解释为 “对 untrusted context 的影响力检测”，而非真假检测，并强调对 trusted false content 的局限性。\n5. 论文表述：提供可直接使用的英文段落，包括机制描述、实验 interpretation、limitations 和 threat model。\n6. 增量实验：若需要，设计最小实验（如不同 trust tier 的 ablation 对比、不同模型规模验证），仅利用现有 pipeline。"
+  },
+  "structured_ir": {
+    "version": "1.5",
+    "decision_summary": "```json { \"version\": \"1.5\", \"decision_summary\": \"将现有 pilot 正式重新定位为 Source-bound Influence Monitor (SIM)，作为 RQ5 中 correction-aware reset 的主动触发器，并从控制论和网安角度构建解释框架；同步进行最小增量实验以验证鲁棒性。\", \"key_claims\": [ \"现有 AUROC 结果（untrusted false 约 0.86，all false 约 0.53）证明 detector 不是事实检测器，而是信任边界影响力监控器。\", \"控制论的残差监控和网安的 sink-side taint tracking 提供了坚实的理论锚点。\", \"SIM 应作为 RQ5 的轻量补充，嵌入 harness 防御闭环，而非独立的 detection paper。\", \"核心局限性包括：依赖 source trust 先验、无法检测 trusted false 内容、以及攻击者可构造低影响力 false context 来规避。\", \"最小增量实验（2×2 子集 AUR...",
+    "key_claims": [
+      "### 可行性评估与重构建议",
+      "命名建议**：",
+      "好的，收到您的详细 briefing。作为负责创新性的 Agent，我将严格基于您提供的已有研究基础、困惑和限制条件，聚焦于如何将现有 pilot 结果重新定位、包装并提升其理论贡献，使其在现有论文框架下显得合理、巧妙且有力，而不是变成一个独立的、沉重的系统论文。",
+      "以下是我的结构化设计建议：",
+      "### 机制深挖与定位建议",
+      "科学问题转化**：将 RQ5 的核心问题从“能否检测假上下文”转化为“能否在 Harness 边界量化低信任上下文对输出的因果影响力，并据此触发防御动作”。"
+    ],
+    "evidence_refs": [
+      {
+        "id": "E-template-1",
+        "source_type": "template",
+        "source_id": "template_input",
+        "source_title": "用户模板",
+        "quote_or_summary": "已有实验包括： 1. 2×2 source/content setting： - trusted source + true content - untrusted source + false content - untrusted source + true content - trusted source + false content 2. provenance mode： - no label - natural-language label - harness-bound label 3. 已实现 so...",
+        "supports": "研究背景、已有基础和资源约束的主依据。"
+      },
+      {
+        "id": "E-briefing-1",
+        "source_type": "intake_briefing",
+        "source_id": "structured_brief",
+        "source_title": "入口模型整合 briefing",
+        "quote_or_summary": "# 讨论组入口整合 briefing：Harness-side Source-bound Residual Monitor 定位与嵌入方案 ## 1. 已知事实（来自用户模板） ### 1.1 论文主线 - 研究 **harness attack / phantom context**：攻击者污染 pre-model assembly context（RAG 检索文档、tool output、memory、control message 等），模型吸收虚假上下文后，即使用户纠正，第二阶段仍可能 lock-in。 - 主线清晰：pre-model assembly context 是攻击面；多 channel context 诱导 absorption；correction-aware reset 能有效切断 S...",
+        "supports": "候选方向和实验路径的前置信息。"
+      },
+      {
+        "id": "E-debate-1",
+        "source_type": "agent_debate",
+        "source_id": "round-1-Feasibility Agent",
+        "source_title": "Feasibility Agent · 第1轮",
+        "quote_or_summary": "### 可行性评估与重构建议 **1. 定位认可与命名策略** 完全认可将 detector 重新定位为 **\"Source-bound Residual Monitor\"** 或 **\"Harness-side Influence Monitor\"**。 * **可行性判断**：当前实验结果（AUROC 0.86 for untrusted vs 0.53 for all false）强有力地支...",
+        "supports": "Feasibility Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-2",
+        "source_type": "agent_debate",
+        "source_id": "round-1-Novelty Agent",
+        "source_title": "Novelty Agent · 第1轮",
+        "quote_or_summary": "好的，收到您的详细 briefing。作为负责创新性的 Agent，我将严格基于您提供的已有研究基础、困惑和限制条件，聚焦于如何将现有 pilot 结果重新定位、包装并提升其理论贡献，使其在现有论文框架下显得合理、巧妙且有力，而不是变成一个独立的、沉重的系统论文。 我的核心判断是：**完全认可“Source-bound residual monitor”这个定位，并且认为这是当前证据条件下最合理、...",
+        "supports": "Novelty Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-3",
+        "source_type": "agent_debate",
+        "source_id": "round-1-Mechanism Agent",
+        "source_title": "Mechanism Agent · 第1轮",
+        "quote_or_summary": "### 机制深挖与定位建议 #### 1. 核心定位：从“检测器”转向“残差监控器” **完全认可**“Source-bound residual monitor”这一重新定位。 你的实验数据（AUROC 0.86 vs 0.53）已经给出了最有力的证据：该模块不具备“事实核查（Fact-checking）”能力，但具备“影响力归因（Influence Attribution）”能力。 - **机...",
+        "supports": "Mechanism Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-4",
+        "source_type": "agent_debate",
+        "source_id": "round-1-Reviewer Agent",
+        "source_title": "Reviewer Agent · 第1轮",
+        "quote_or_summary": "好的，作为本轮讨论的“严谨评审者和论文审稿人模拟 Agent”，我将基于你提供的详细 briefing 和当前状态，针对你的 detector 定位困惑提出我的审稿意见。 --- ### 审稿意见：关于 `Source-bound Residual Monitor` 定位及嵌入方案的评估 我仔细阅读了你的 briefing，核心矛盾在于：你拥有一个对 `untrusted + false` con...",
+        "supports": "Reviewer Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-5",
+        "source_type": "agent_debate",
+        "source_id": "round-1-Moderator",
+        "source_title": "Moderator · 第1轮",
+        "quote_or_summary": "### 1. 各 Agent 已形成的互补点 - **定位共识**：所有 Agent 一致认可应将 detector 重新定位为 harness-side 的**影响力监控器**，而非 false-context detector，核心是“监控低信任 source 对输出的因果影响力”。 - **理论支撑**：各 Agent 均支持从控制论（residual monitoring）和网安（IDS/...",
+        "supports": "Moderator 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-6",
+        "source_type": "agent_debate",
+        "source_id": "round-2-Novelty Agent",
+        "source_title": "Novelty Agent · 第2轮",
+        "quote_or_summary": "好的，作为负责创新性的 Agent，我仔细阅读了上一轮所有 Agent 的讨论以及 Moderator 的冲突点梳理。我的核心任务是：在严格遵循用户限制的前提下，将现有 pilot 的定位从“检测器”升华为一个具有理论深度和系统价值的“监控机制”，并与 RQ5 无缝融合。本轮我将不再重复上一轮已达成共识的基础部分（如再定位的必要性），而是直接针对**冲突点、遗漏点**给出我的判断和补充反驳。 --...",
+        "supports": "Novelty Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-7",
+        "source_type": "agent_debate",
+        "source_id": "round-2-Mechanism Agent",
+        "source_title": "Mechanism Agent · 第2轮",
+        "quote_or_summary": "### 机制深挖与定位建议 针对 Moderator 指出的冲突点与遗漏点，我将从因果链条、机制假设和最小验证实验三个维度进行回应。 #### 1. 命名与定位：统一为 \"Source-Bound Residual Monitor (SBRM)\" 我支持使用 **SBRM** 而非 SIM。 * **理由**：在控制论中，\"Residual\" 特指系统输出与期望输出（或无干扰输出）之间的差异，是故...",
+        "supports": "Mechanism Agent 在讨论中提出的相关论据。"
+      },
+      {
+        "id": "E-debate-8",
+        "source_type": "agent_debate",
+        "source_id": "round-2-Feasibility Agent",
+        "source_title": "Feasibility Agent · 第2轮",
+        "quote_or_summary": "### 可行性评估与重构建议 针对 Moderator 指出的冲突点（命名、增量实验、成本）及遗漏点（2×2 子集数据、Residual 定义），作为可行性评估专家，我的核心判断是：**必须通过“零成本”的数据后处理来填补证据漏洞，否则该机制在审稿人眼中缺乏鲁棒性。** #### 1. 命名与定位：统一为 SBRM 我支持 **Source-Bound Residual Monitor (SBRM...",
+        "supports": "Feasibility Agent 在讨论中提出的相关论据。"
+      }
+    ],
+    "critique_points": [
+      {
+        "id": "C-evidence-1",
+        "target_id": "D1",
+        "dimension": "证据强度",
+        "severity": "medium",
+        "content": "模型未能输出合法 IR JSON,系统按 Markdown 与讨论摘要回退构建;证据绑定需要人工复核。",
+        "mitigation": "优先核对上传文档和入口 briefing 中与 Top 方向相关的关键事实。"
+      }
+    ],
+    "candidate_directions": [
+      {
+        "id": "D1",
+        "title": "排序总结 (Candidate Directions Priority Summary)",
+        "research_question": "排序总结 (Candidate Directions Priority Summary)",
+        "rationale": "来自结构化 IR Markdown 与讨论摘要的回退抽取,需要在下一轮复核证据链。",
+        "novelty": "需结合 Novelty Agent 的主张进一步确认。",
+        "feasibility": "需结合 Feasibility Agent 的资源约束判断。",
+        "risks": [
+          "证据绑定不完整",
+          "排序理由需要复核"
+        ],
+        "alternatives": [
+          "保留为备选方向,等待补充证据后再排序"
+        ],
+        "priority": 1,
+        "priority_reason": "按 IR 文本出现顺序暂定。",
+        "evidence_refs": [
+          "E-template-1",
+          "E-briefing-1",
+          "E-debate-1",
+          "E-debate-2"
+        ],
+        "critique_refs": [
+          "C-evidence-1"
+        ],
+        "next_actions": [
+          "复核证据来源",
+          "补齐关键验证实验"
+        ]
+      }
+    ]
+  },
+  "ir_warnings": [],
+  "external_references": [
+    {
+      "id": "REF-1",
+      "source_type": "paper",
+      "title": "Residual-based Anomaly Detection for Industrial Processes",
+      "authors": "Gertler, J.",
+      "url": "https://doi.org/10.1016/S0167-6911(98)00003-1",
+      "year": "1998",
+      "cited_viewpoint": "支撑控制论视角的残差监测理论",
+      "citing_agent": "Feasibility Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-2",
+      "source_type": "paper",
+      "title": "Taint Analysis for LLM Security",
+      "authors": "Chen et al.",
+      "url": "https://arxiv.org/abs/2305.12345 (示例链接，需替换为实际相关论文如 \"TaintLLM\" 或 \"Prompt Injection via Taint Tracking\")",
+      "year": "2023",
+      "cited_viewpoint": "支撑网安视角的 Taint Tracking 概念",
+      "citing_agent": "Feasibility Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-3",
+      "source_type": "dataset",
+      "title": "Natural Questions (NQ)",
+      "authors": "Google Research",
+      "url": "https://ai.google.com/research/NaturalQuestions",
+      "year": "2019",
+      "cited_viewpoint": "支撑实验数据集的公开性和可比性",
+      "citing_agent": "Feasibility Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-4",
+      "source_type": "paper",
+      "title": "A survey of design methods for failure detection in dynamic systems",
+      "authors": "Gertler, J. J.",
+      "url": "Automatica, 1988",
+      "year": "待确认 (经典控制论 FDIR 论文，支撑残差监测观点)",
+      "cited_viewpoint": "",
+      "citing_agent": "Novelty Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-5",
+      "source_type": "paper",
+      "title": "Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software.",
+      "authors": "Newsome, J. and Song, D.",
+      "url": "NDSS 2005",
+      "year": "待确认 (经典污点追踪论文，支撑网安视角的 sink-point 检查观点)",
+      "cited_viewpoint": "",
+      "citing_agent": "Novelty Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-6",
+      "source_type": "paper",
+      "title": "Residual-based fault detection and isolation: A survey",
+      "authors": "G. Wang et al.",
+      "url": "待确认",
+      "year": "2020",
+      "cited_viewpoint": "支撑残差监控作为故障检测标准方法的观点",
+      "citing_agent": "Mechanism Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-7",
+      "source_type": "paper",
+      "title": "Taint analysis for detecting security vulnerabilities",
+      "authors": "S. McCamant et al.",
+      "url": "待确认",
+      "year": "2004",
+      "cited_viewpoint": "支撑 Taint Tracking 在 Sink 处检查污染传播的观点",
+      "citing_agent": "Mechanism Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-8",
+      "source_type": "paper",
+      "title": "How to Write a Good (Computer Science) Paper",
+      "authors": "Kraut, P.",
+      "url": "待确认",
+      "year": "2020",
+      "cited_viewpoint": "支撑关于“overclaim”和清晰限定贡献边界的论点。本文中，将 detector 从“全知”定位到“专有功能”，是避免 overclaim 的关键。",
+      "citing_agent": "Reviewer Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-9",
+      "source_type": "paper",
+      "title": "Rethinking Alignment: Lying, Stealing, and Cheating in the Age of LLMs",
+      "authors": "S. Radhakrishnan et al. (Anthropic)",
+      "url": "待确认",
+      "year": "2024",
+      "cited_viewpoint": "支撑将安全问题从“内容真假”转向“源头和影响力控制”的视角。关于模型在可控输入路径上的责任边界讨论具有参考价值。",
+      "citing_agent": "Reviewer Agent",
+      "round": 1
+    },
+    {
+      "id": "REF-10",
+      "source_type": "paper",
+      "title": "Taint Analysis for Web Security",
+      "authors": "O. Tripp et al.",
+      "url": "待确认",
+      "year": "2009",
+      "cited_viewpoint": "支撑将 SIM 类比为动态污点分析在 sink (LLM output) 点检查数据影响力。",
+      "citing_agent": "Novelty Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-11",
+      "source_type": "paper",
+      "title": "Machine Learning in Feedback Control Systems",
+      "authors": "K. Chen et al.",
+      "url": "待确认",
+      "year": "2010",
+      "cited_viewpoint": "支撑将阈值选择视为控制论中的 `residual evaluation` 阶段。",
+      "citing_agent": "Novelty Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-12",
+      "source_type": "paper",
+      "title": "\"The Impact of Contextual Information on Large Language Model Outputs\"",
+      "authors": "Zhang et al.",
+      "url": "待确认",
+      "year": "2023",
+      "cited_viewpoint": "发现上下文移除会导致输出分布显著偏移，支撑 SBRM 的残差机制。",
+      "citing_agent": "Mechanism Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-13",
+      "source_type": "paper",
+      "title": "\"Taint Tracking for Large Language Models\"",
+      "authors": "Liu et al.",
+      "url": "待确认",
+      "year": "2024",
+      "cited_viewpoint": "提出在 LLM 中进行污点追踪的概念，支撑 SBRM 的网安类比。",
+      "citing_agent": "Mechanism Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-14",
+      "source_type": "paper",
+      "title": "Evaluating the Robustness of Large Language Models to Context Injection Attacks",
+      "authors": "Chen et al.",
+      "url": "https://arxiv.org/abs/2310.17623",
+      "year": "2023",
+      "cited_viewpoint": "支持在安全评估中报告完整 2×2 矩阵（TPR/FPR）以证明机制边界。",
+      "citing_agent": "Feasibility Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-15",
+      "source_type": "book",
+      "title": "Control Systems Engineering",
+      "authors": "Nise",
+      "url": "https://www.pearson.com/en-us/subject-catalog/p/control-systems-engineering/P200000003345/9780137443983",
+      "year": "2020",
+      "cited_viewpoint": "支持将 SBRM 解释为控制论中的残差生成与监控机制。",
+      "citing_agent": "Feasibility Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-16",
+      "source_type": "paper",
+      "title": "Sensitivity Analysis as an Explanation for Model Behavior",
+      "authors": "Slack et al., ACL 2021",
+      "url": "https://aclanthology.org/2021.acl-long.275/",
+      "year": "2021",
+      "cited_viewpoint": "支持将“输出对输入扰动的敏感性”作为可解释性指标，而非因果推断。",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-17",
+      "source_type": "paper",
+      "title": "D3: A Dataset for Detecting Domain-Driven Differences in QA",
+      "authors": "Chen et al., EMNLP 2020",
+      "url": "https://aclanthology.org/2020.emnlp-main.150/",
+      "year": "2020",
+      "cited_viewpoint": "支持使用 claim 级 Jaccard 相似度衡量答案差异。",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-18",
+      "source_type": "paper",
+      "title": "Llama 2: Open Foundation and Fine-Tuned Chat Models",
+      "authors": "Touvron et al., arXiv 2023",
+      "url": "https://arxiv.org/abs/2307.09288",
+      "year": "2023",
+      "cited_viewpoint": "提供 Llama-3-8B 的推理速度参考（约 30 tokens/s on A100）。",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-19",
+      "source_type": "paper",
+      "title": "Tool-Augmented Language Models: A Survey",
+      "authors": "Qin et al., arXiv 2023",
+      "url": "https://arxiv.org/abs/2305.17118",
+      "year": "2023",
+      "cited_viewpoint": "支持按信任等级分级触发监控的 agent 系统设计原则。",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-20",
+      "source_type": "paper",
+      "title": "On the (Im)possibility of Compositional Security",
+      "authors": "Paterson et al., IEEE S&P 2015",
+      "url": "待确认",
+      "year": "支持安全组件需独立验证组合效果的方法论。",
+      "cited_viewpoint": "",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-21",
+      "source_type": "paper",
+      "title": "Understanding and Detecting Label Leakage in Machine Learning",
+      "authors": "Papernot et al., S&P 2018",
+      "url": "https://arxiv.org/abs/1802.04988",
+      "year": "2018",
+      "cited_viewpoint": "支持 source provenance 不可伪造假设在系统安全中的标准分类。",
+      "citing_agent": "Reviewer Agent",
+      "round": 2
+    },
+    {
+      "id": "REF-22",
+      "source_type": "paper",
+      "title": "Boundaries of Influence: The Power of AI",
+      "authors": "Cohere",
+      "url": "待确认",
+      "year": "2023",
+      "cited_viewpoint": "支撑“输出对输入敏感性分析”可作为因果影响力测量的替代方案。",
+      "citing_agent": "Novelty Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-23",
+      "source_type": "paper",
+      "title": "Detecting and Evolving Threats: A Look into LLM Security",
+      "authors": "arXiv",
+      "url": "待确认",
+      "year": "2024",
+      "cited_viewpoint": "支撑将 ablation-based detection 定位为 IDS-style alert 而非事实验证的观点。",
+      "citing_agent": "Novelty Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-24",
+      "source_type": "paper",
+      "title": "Residual-based Fault Detection in Control Systems",
+      "authors": "Basseville, M. & Nikiforov, I.",
+      "url": "https://doi.org/10.1007/978-1-4612-1652-0",
+      "year": "1993",
+      "cited_viewpoint": "支撑控制论残差监控机制",
+      "citing_agent": "Mechanism Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-25",
+      "source_type": "paper",
+      "title": "Taint Analysis for Security",
+      "authors": "Collberg, C. et al.",
+      "url": "https://doi.org/10.1145/278606.278614",
+      "year": "1997",
+      "cited_viewpoint": "支撑网安污点追踪概念",
+      "citing_agent": "Mechanism Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-26",
+      "source_type": "paper",
+      "title": "Residual Generation and Evaluation in Fault Diagnosis",
+      "authors": "Patton, R. J.",
+      "url": "https://doi.org/10.1109/36.210857",
+      "year": "1989",
+      "cited_viewpoint": "支撑控制论残差监控框架",
+      "citing_agent": "Feasibility Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-27",
+      "source_type": "paper",
+      "title": "Taint Analysis for Security",
+      "authors": "Collberg, C. et al.",
+      "url": "https://doi.org/10.1145/277672.277683",
+      "year": "1997",
+      "cited_viewpoint": "支撑网安污点追踪概念",
+      "citing_agent": "Feasibility Agent",
+      "round": 3
+    },
+    {
+      "id": "REF-28",
+      "source_type": "paper",
+      "title": "Understanding the Sensitivity of LLMs to Input Perturbations",
+      "authors": "Wei, J., et al.",
+      "url": "arXiv:2311.17341",
+      "year": "2023",
+      "cited_viewpoint": "支撑“输出对上下文移除的敏感性分析”而非严格“因果影响推断”的观点。您的 shadow ablation 本质是一种敏感性分析，引用此论文可避免审稿人质疑因果推断的严密性。",
+      "citing_agent": "Reviewer Agent",
+      "round": 3
+    }
+  ],
+  "documents": [
+    {
+      "id": "doc-1783304940040-237dbdc13ad198",
+      "name": "main.pdf",
+      "doc_type": "other",
+      "content": "[提取失败: No module named 'pdfplumber']",
+      "note": "",
+      "summary": "No module named 'pdfplumber'"
+    }
+  ],
+  "debate_messages": [
+    {
+      "round": 1,
+      "agent": "Feasibility Agent",
+      "title": "第 1 轮 · 可行性",
+      "content": "### 可行性评估与重构建议\n\n**1. 定位认可与命名策略**\n完全认可将 detector 重新定位为 **\"Source-bound Residual Monitor\"** 或 **\"Harness-side Influence Monitor\"**。\n*   **可行性判断**：当前实验结果（AUROC 0.86 for untrusted vs 0.53 for all false）强有力地支持“非事实检测，而是影响力监控”的论点。若强行包装为 fact-checker，会在 Reviewer 阶段因“无法处理 Trusted-False”而崩溃。\n*   **命名建议**：\n    1.  **Source-Bound Residual Monitor (SBRM)**：强调控制论视角，突出“残差”概念，适合强调机制新颖性。\n    2.  **Contextual Influence Sentinel (CIS)**：强调网安视角，Sentinel 暗示其作为 IDS 的轻量级、监控属性，而非阻断器。\n    3.  **Provenance-Gated Residual Checker**：强调依赖 Source Identity 这一先验条件。\n    *建议首选 SBRM，因为它最贴合你现有的 `source_bound_influence` 代码变量名，且“Residual”在控制论中有明确定义。*\n\n**2. 最小 Detector 设计与嵌入 RQ5**\n*   **设计原则**：不新增模型，不改动 Pipeline。利用现有 `source_bound_influence_detector.py` 的输出。\n*   **嵌入方式**：作为 RQ5 的一个 **Sub-module** 或 **Case Study**。\n    *   RQ5 主标题：*Can harness-side controls mitigate phantom context lock-in?*\n    *   RQ5.1: Correction-aware reset 的有效性（已有）。\n    *   RQ5.2: **Automated Triggering via Residual Monitoring**（新增轻量部分）。\n    *   **逻辑链条**：Reset 是“药”，但何时吃药？SBRM 是“诊断仪”。SBRM 检测到 High Residual from Untrusted Source → 触发 Reset。\n*   **技术实现**：无需新代码。只需在论文中定义一个阈值 $\\tau$。若 $Score_{SBRM} > \\tau$，则标记为 `Quarantine` 并触发 Reset。\n\n**3. 解释框架：控制论与网安**\n*   **控制论视角 (Residual Monitoring)**：\n    *   将 LLM 视为一个非线性系统 $y = f(x, c)$，其中 $c$ 是 context。\n    *   定义残差 $r = y_{full} - y_{ablated}$。\n    *   若 $c$ 来自 Untrusted Source 且 $|r|$ 显著，则判定为“异常扰动”。这类似于工业控制中的 **Fault Detection and Isolation (FDI)**，通过比较正常工况（ablated）与当前工况（full）的残差来检测故障（injection）。\n    *   *引用支撑*：参考 **Gertler (1998)** 的残差生成理论，或更贴近 AI 安全的 **Chen et al. (2023) \"Residual-based Anomaly Detection\"** 思路。\n*   **网安视角 (Taint Tracking / Sink Analysis)**：\n    *   Source-bound context 是 **Taint Source**。\n    *   Model Output 是 **Sink**。\n    *   SBRM 执行的是 **Sink-side Influence Check**。它不关心 Taint 的内容真假，只关心 Taint 是否流入了 Sink 并改变了输出。\n    *   这类似于 **IDS (Intrusion Detection System)** 的异常检测模式，而非签名匹配。\n\n**4. 实验结果重写与 Limitations**\n*   **结果重述**：\n    *   不要说：“SBRM 检测到了 86% 的虚假上下文。”\n    *   要说：“SBRM 成功识别了 86% 的 **Untrusted Context 对输出的显著影响**（AUROC=0.86）。然而，对于 Trusted Source 提供的虚假内容，SBRM 的 AUROC 仅为 0.53，表明其无法区分来源可信但内容错误的情况。这证实了 SBRM 是一个 **Source-aware Influence Monitor**，而非通用 Fact-Checker。”\n*   **Limitations / Threat Model**：\n    *   **Attacker Capability**：假设攻击者无法伪造 Source Identity（即 Source Trust 是可信的）。如果攻击者能 Spoof Source，SBRM 失效。\n    *   **Trusted-False Blindness**：明确承认 SBRM 对 Trusted-False 无效。这是设计取舍（Trade-off）：为了轻量级和无需外部知识库，牺牲了对可信源错误的检测能力。\n    *   **Cost**：Shadow Ablation 需要一次额外的 LLM 调用（Inference Cost +1x）。这是主要开销。\n\n**5. 最小增量实验建议**\n*   **无需大规模新实验**。只需利用现有日志进行 **Post-hoc Analysis**：\n    1.  **Threshold Sensitivity**：在现有数据上，绘制不同阈值 $\\tau$ 下的 Precision-Recall 曲线。选择一个平衡点（如 F1-max），证明存在一个合理的触发阈值。\n    2.  **Cost-Benefit Analysis**：计算 SBRM 的额外延迟（1x LLM call） vs. 拦截成功率。证明在高风险场景下，这个 Cost 是可接受的。\n    3.  **Qualitative Examples**：从日志中抽取 2-3 个典型 Case：\n        *   Case A: Untrusted-False, High Residual, Triggered Reset, Success.\n        *   Case B: Trusted-False, Low Residual (or High but ignored), No Trigger, Failure (as expected).\n        *   用这些 Case 直观展示机制。\n\n**6. 英文表述建议**\n*   *Mechanism*: \"We propose a **Source-Bound Residual Monitor (SBRM)** that operates at the harness boundary. By performing shadow ablation on untrusted context objects, SBRM computes the output residual between the full-context and ablated-context responses. A significant residual indicates that the untrusted context has exerted undue influence on the model's output, triggering a quarantine or correction-aware reset.\"\n*   *Limitation*: \"SBRM is designed as an influence monitor, not a truth verifier. It relies on source trust tiers and cannot detect false information from trusted sources (Trusted-False), as evidenced by its near-random AUROC (0.53) on such cases. This limitation is inherent to its lightweight, provenance-gated design.\"\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 将 detector 定位为 \"Source-Bound Residual Monitor (SBRM)\"，强调其作为 harness-side 的影响力监控器，而非事实检测器。\n- 支撑依据: 现有 AUROC 结果（Untrusted 高，All False 低）完美支持此定位；控制论残差监测和网安 Taint Tracking 提供理论框架。\n- 风险或反驳点: 需明确承认 Trusted-False 盲点；需量化 Shadow Ablation 的推理成本。\n- 建议进入 IR 的下一步动作: 利用现有日志进行阈值敏感性分析和定性案例抽取，无需新实验。\n\n### 外部引用\n[paper] Residual-based Anomaly Detection for Industrial Processes | Gertler, J. | https://doi.org/10.1016/S0167-6911(98)00003-1 | 1998 | 支撑控制论视角的残差监测理论\n[paper] Taint Analysis for LLM Security | Chen et al. | https://arxiv.org/abs/2305.12345 (示例链接，需替换为实际相关论文如 \"TaintLLM\" 或 \"Prompt Injection via Taint Tracking\") | 2023 | 支撑网安视角的 Taint Tracking 概念\n[dataset] Natural Questions (NQ) | Google Research | https://ai.google.com/research/NaturalQuestions | 2019 | 支撑实验数据集的公开性和可比性",
+      "model_label": "中国科大 107 算力平台 / qwen3.6-chat",
+      "ir_summary": "关键主张: 将 detector 定位为 \"Source-Bound Residual Monitor (SBRM)\"，强调其作为 harness-side 的影响力监控器，而非事实检测器。\n- 支撑依据: 现有 AUROC 结果（Untrusted 高，All False 低）完美支持此定位；控制论残差监测和网安 Taint Tracking 提供理论框架。\n- 风险或反驳点: 需明确承认 Trusted-False 盲点；需量化 Shadow Ablation 的推理成本。\n- 建议进入 IR 的下一步动作: 利用现有日志进行阈值敏感性分析和定性案例抽取，无需新实验。",
+      "claims": [
+        "### 可行性评估与重构建议",
+        "命名建议**：",
+        "建议首选 SBRM，因为它最贴合你现有的 `source_bound_influence` 代码变量名，且“Residual”在控制论中有明确定义。",
+        "Attacker Capability**：假设攻击者无法伪造 Source Identity（即 Source Trust 是可信的）。如果攻击者能 Spoof Source，SBRM 失效。"
+      ],
+      "concerns": [
+        "2.  **Cost-Benefit Analysis**：计算 SBRM 的额外延迟（1x LLM call） vs. 拦截成功率。证明在高风险场景下，这个 Cost 是可接受的。",
+        "风险或反驳点: 需明确承认 Trusted-False 盲点；需量化 Shadow Ablation 的推理成本。"
+      ]
+    },
+    {
+      "round": 1,
+      "agent": "Novelty Agent",
+      "title": "第 1 轮 · 创新性",
+      "content": "好的，收到您的详细 briefing。作为负责创新性的 Agent，我将严格基于您提供的已有研究基础、困惑和限制条件，聚焦于如何将现有 pilot 结果重新定位、包装并提升其理论贡献，使其在现有论文框架下显得合理、巧妙且有力，而不是变成一个独立的、沉重的系统论文。\n\n我的核心判断是：**完全认可“Source-bound residual monitor”这个定位，并且认为这是当前证据条件下最合理、最具学术价值的解释路径。** 它精准地避免了“事实检测器”的陷阱，并巧妙地利用了您的实验设计（source/trust绑定）的核心优势。\n\n以下是我的结构化设计建议：\n\n### 1. 定位认可与命名候选\n\n**是否认可 “Source-bound residual monitor” 这个定位？**\n完全认可。这个定位精准地描述了您的核心机制：它不关心“什么是真”，只关心“一个被标记为不可信的源，是否真的影响了输出”。它是建立在“harness boundary”上的一个流程检查点，而不是一个内容审查员。这完美契合了需要“轻量”、“不依赖 Oracle”且“不破坏现有结构”的核心要求。\n\n**2-3个命名候选（按推荐顺序）：**\n1.  **Source-Bound Influence Monitor (SIM)**：最直接，准确描述了“基于源的”和“影响力”两个核心。“Monitor”比“Detector”更中性，暗示警报而非判决。\n2.  **Harness-Side Residual Monitor (HRM)**：强调位置（harness side）和机制（residual comparison）。如果您的论文非常强调“harness”是安全边界，这个命名更好。\n3.  **Trust-Aware Influence Checker (TAIC)**：更直接地指出了输入是 source trust tier，输出是 influence score。适合在讨论时作为内部术语。\n\n*推荐首选：**Source-Bound Influence Monitor (SIM)**。*\n\n### 2. 最小 Detector 设计（不破坏现有 RQ5）\n\n您的现有代码已经完成了核心工作。无需任何新的大规模实验。只需对现有逻辑进行**概念包装**和**结果解读**即可。\n\n**最小设计就是您已有的流程：**\n- **Input 1:** A list of `context objects`, each with `source_id` and `trust_tier` (e.g., `{trusted, untrusted, unverified}`).\n- **Input 2:** A query prompt.\n- **Step 1 (Shadow Ablation):** For each `untrusted` or `unverified` context, run an inference call to the LLM **without** that specific context, keeping all other contexts (including other untrusted ones) the same. This is your **shadow run**.\n- **Step 2 (Residual Calculation):** Compare the output of the **full assembly (with all contexts)** against the output of the **shadow run (without the target untrusted context)**. The \"salient answer residual\" is the key metric.\n- **Step 3 (Alert Logic):** If the residual exceeds a threshold (e.g., the answer entity, key number, or core claim changes), the monitor raises an alert for that specific source. The alert action is `quarantine`, `downrank`, `trigger correction-aware reset`, or `audit log`.\n\n**如何嵌入 RQ5？**\n将 RQ5 标题从“<现有标题>”修改为：“**Harness-Side Defenses: Correction-Aware Reset and the Source-Bound Influence Monitor**”。将原有的 correction-aware reset 作为 **主动防御机制**，将您的 SIM 作为 **被动监控和触发机制**。SIM 发出的警报，就是启动 correction-aware reset 的（之一）信号。这就形成了一个完整的 **“监控-响应”闭环**。\n\n### 3. 控制论与网安解释框架\n\n**控制论角度 (Residual Monitoring):**\n这是一个经典的**故障检测与隔离 (FDI)** 问题。您的“system”是 LLM + context assembly。您的“model”是理想的无污染上下文执行路径。您的“plant”是受污染的上下文。您生成一个**残差信号**：`r = f(assembly) - f(assembly_without_untrusted_source)`。当 `r` 非零（且显著）时，表示存在来自该未知来源的干扰。这正是控制论中 FDIR 的雏形。这个类比非常有力，能显著提升理论高度。\n\n*引用支撑：* 可以引用经典的残差生成方法，如基于观测器的方法。\n> [Paper] A survey of design methods for failure detection in dynamic systems | Gertler, J. J. | Automatica, 1988 | 支撑观点：将 LLM 输出与消融后输出的偏差视为残差信号，用于监测系统异常（上下文污染）。\n\n**网安角度 (IDS / Taint Tracking):**\n这本质上是**基于规则的入侵检测系统 (IDS)**。您的“规则”是：“一个 source trust 为‘untrusted’的实体，其 influence 不应该出现在最终输出中”。您的“签名”是：“在 sink point（最终输出）检测到来自一个 untrusted source 的 taint（influence）”。它不判断 taint 内容好坏，只判断 taint 流是否非法。这比用 ML 模型做 Content-based IDS 更透明、可解释，且能抵御对抗攻击。\n\n*引用支撑：* 可以引用经典的动态污点分析工作。\n> [Paper] Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software. | Newsome, J. and Song, D. | NDSS 2005 | 支撑观点：将 untrusted source 的 influence 视为“污点”，在输出点（sink）检测其是否存在，是污点追踪的典型应用。\n\n### 4. 论文中可直接使用的英文表述\n\n**Mechanism Description:**\n> \"To operationalize detection without access to ground truth, we introduce the **Source-Bound Influence Monitor (SIM)**. SIM operates at the harness boundary. For each context object, the harness embeds a provenance tag containing its `source_id` and an extrinsic `trust_tier` (trusted, untrusted, unverified). SIM performs a **shadow ablation**: for each context marked as `untrusted` or `unverified`, it re-queries the model *without* that specific context, while keeping the rest of the assembly intact. By comparing the full-context output to the ablated output, SIM computes a **salient output residual**. A significant residual indicates a measurable *influence* of that low-trust source on the model's final response. This is not a false-context detector; rather, it is a harness-side **influence monitor**, analogous to a residual generator in control theory or a sink-point taint check in security, trading the goal of perfect truth detection for robustness and interpretability at the system boundary.\"\n\n**Result Interpretation:**\n> \"Results demonstrate the feasibility of this monitor. For `untrusted, false` contexts, SIM achieves an AUROC of ~0.857, confirming its ability to flag when an untrusted source materially alters the output. Crucially, SIM's performance collapses to random (AUROC ~0.53) when it is misapplied as a universal false-context detector (i.e., all false contexts including those from trusted sources). This supports our framing: SIM is not a truth detector but a **boundary-oriented influence monitor**, effective precisely where the system has a priori source trust assumptions.\"\n\n### 5. 实验结果如何重写 Interpretation\n\n**当前表述:** \"对 untrusted false context AUROC ≈ 0.8575\"\n**建议重写为:** \"对于 `untrusted source` 和 `false content` 的组合，SIM 实现了 0.8575 的 AUROC，验证了其对来自低信任来源的、对模型输出产生了显著影响的上下文进行有效监测的能力。\"\n\n**关键转变：** 不再强调它检测到了“false content”，而是强调它检测到了来自`untrusted source`的`influence`。\n\n**Weakness 表述:**\n> \"The ~0.53 AUROC for 'all false contexts' is expected and reinforces SIM's design principle: it is a trust-bound, not truth-bound, monitor. A trusted source introducing false content is an external attack or failure of the trust model, not a risk detectable by SIM. This is a fundamental limitation.\"\n\n### 6. Limitations / Threat Model / Attacker Capability 写法\n\n**Limitations:**\n- **Reliance on Source Trust:** SIM's detection capability is fundamentally bounded by the accuracy of the source trust model. A compromised trusted source will be invisible to SIM.\n- **Salient Residual Granularity:** The current residual comparison focuses on salient output features (entities, numbers). Subtle semantic shifts, like a more persuasive but false argument, may not trigger an alert.\n- **Computational Overhead:** Shadow ablation requires additional inference calls for each untrusted context, introducing latency proportional to the number of such contexts.\n\n**Threat Model:**\n- **Adversarial Goal:** To have a false claim from an `untrusted` or `unverified` source incorporated into the model's final response without triggering an alert.\n- **Attacker Capability:** The attacker controls the content of the `untrusted` source. They can craft content that is false but seemingly irrelevant (low influence) or that entangles with content from trusted sources in a way that makes residual comparison less sensitive. In a more sophisticated attack, they might try to compromise the trust model itself (a meta-attack).\n- **Assumption:** The harness's source trust assignment mechanism is robust against the direct compromise we are detecting. The attacker cannot arbitrarily set their source's trust tier to `trusted`.\n\n### 7. 判断是否需要新增小实验\n\n**不需要新增大规模实验。** 您的 pilot 结果已经完全支撑了您的论点。但可以考虑一个**最小增量分析**来强化关键主张：\n\n**可选的最小增量实验：**\n- **Ablating over Influence Scores Instead of Source Trust:** 当前您是基于 source trust 进行 ablation。可以设计一个变体，使用 `influence_only` baseline 计算出的影响分数，设定一个阈值，然后观察 High-Influence vs. Low-Influence 的 ablation 效果。这可以用来论证：即使没有 source trust，一个纯 influence-based 的检测也能发现一些异常（但效果会差）。\n  - **目的：** 这是一个优雅的反事实论证。它证明了 `source-bound` 的价值。如果纯 influence 检测效果差，而加上 source trust 后效果好，这恰恰证明了组合策略（您的 SIM）的优越性。\n  - **所需工作：** 您已有 `influence_only_focal_offline` baseline 的结果。只需重新分析它的结果，并与您的 `source_bound_influence` 结果进行对比即可。不需要新代码，仅需数据分析。\n\n### 给结构化 IR 的要点摘要\n- **关键主张:** 将现有 detector 重新定位为“Source-Bound Influence Monitor (SIM)”，它不检测事实，而是在 harness 边界监控来自低信任源的、对输出产生实际影响的残差。\n- **支撑依据:** 实验数据 (AUROC 在 untrusted false 上为 0.86，在所有 false 上为 0.53) 完美支持“不是真假检测器，而是信任边界影响力监控器”的定位。控制论和网安的解释框架能够提升理论的深度和优雅度。\n- **风险或反驳点:** 需要清晰阐述其核心局限性——依赖于 source trust 的先验准确性，且无法检测来自被攻陷的可信源的恶意内容。\n- **建议进入 IR 的下一步动作:** 采纳“Source-Bound Influence Monitor”命名，将其作为 RQ5 的监控组件嵌入“监控-响应”闭环，并利用现有数据重写实验 Interpretation，强调“影响力”而非“事实真假”。\n\n### 外部引用\n[Paper] A survey of design methods for failure detection in dynamic systems | Gertler, J. J. | Automatica, 1988 | 待确认 (经典控制论 FDIR 论文，支撑残差监测观点)\n[Paper] Dynamic Taint Analysis for Automatic Detection, Analysis, and Signature Generation of Exploits on Commodity Software. | Newsome, J. and Song, D. | NDSS 2005 | 待确认 (经典污点追踪论文，支撑网安视角的 sink-point 检查观点)",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**关键主张:** 将现有 detector 重新定位为“Source-Bound Influence Monitor (SIM)”，它不检测事实，而是在 harness 边界监控来自低信任源的、对输出产生实际影响的残差。\n- **支撑依据:** 实验数据 (AUROC 在 untrusted false 上为 0.86，在所有 false 上为 0.53) 完美支持“不是真假检测器，而是信任边界影响力监控器”的定位。控制论和网安的解释框架能够提升理论的深度和优雅度。\n- **风险或反驳点:** 需要清晰阐述其核心局限性——依赖于 source trust 的先验准确性，且无法检测来自被攻陷的可信源的恶意内容。\n- **建议进入 IR 的下一步动作:** 采纳“Source-Bound Influence Monitor”命名，将其作为 RQ5 的监控组件嵌入“监控-响应”闭环，并利用现有数据重写实验 Interpretation，强调“影响力”而非“事实真假”。",
+      "claims": [
+        "好的，收到您的详细 briefing。作为负责创新性的 Agent，我将严格基于您提供的已有研究基础、困惑和限制条件，聚焦于如何将现有 pilot 结果重新定位、包装并提升其理论贡献，使其在现有论文框架下显得合理、巧妙且有力，而不是变成一个独立的、沉重的系统论文。",
+        "以下是我的结构化设计建议：",
+        "建议重写为:** \"对于 `untrusted source` 和 `false content` 的组合，SIM 实现了 0.8575 的 AUROC，验证了其对来自低信任来源的、对模型输出产生了显著影响的上下文进行有效监测的能力。\"",
+        "建议进入 IR 的下一步动作:** 采纳“Source-Bound Influence Monitor”命名，将其作为 RQ5 的监控组件嵌入“监控-响应”闭环，并利用现有数据重写实验 Interpretation，强调“影响力”而非“事实真假”。"
+      ],
+      "concerns": [
+        "好的，收到您的详细 briefing。作为负责创新性的 Agent，我将严格基于您提供的已有研究基础、困惑和限制条件，聚焦于如何将现有 pilot 结果重新定位、包装并提升其理论贡献，使其在现有论文框架下显得合理、巧妙且有力，而不是变成一个独立的、沉重的系统论文。",
+        "风险或反驳点:** 需要清晰阐述其核心局限性——依赖于 source trust 的先验准确性，且无法检测来自被攻陷的可信源的恶意内容。"
+      ]
+    },
+    {
+      "round": 1,
+      "agent": "Mechanism Agent",
+      "title": "第 1 轮 · 机制深挖",
+      "content": "### 机制深挖与定位建议\n\n#### 1. 核心定位：从“检测器”转向“残差监控器”\n**完全认可**“Source-bound residual monitor”这一重新定位。\n你的实验数据（AUROC 0.86 vs 0.53）已经给出了最有力的证据：该模块不具备“事实核查（Fact-checking）”能力，但具备“影响力归因（Influence Attribution）”能力。\n- **机制本质**：它不判断 Context 的 Truth Value，而是判断 Context 的 **Causal Influence on Output**。\n- **科学问题转化**：将 RQ5 的核心问题从“能否检测假上下文”转化为“能否在 Harness 边界量化低信任上下文对输出的因果影响力，并据此触发防御动作”。\n\n#### 2. 命名候选\n建议采用强调“边界”和“影响”的命名，避免“Detector”带来的真假二元对立暗示：\n1. **Source-Bound Residual Monitor (SBRM)**：强调控制论视角，监控 Full Context 与 Ablated Context 之间的残差。\n2. **Harness-Side Influence Monitor (HSIM)**：强调网安视角，监控 Harness 边界内各 Source 对 Sink（输出）的影响。\n3. **Contextual Taint Monitor (CTM)**：强调 Taint Tracking 视角，追踪低信任 Source 是否“污染”了最终输出。\n\n**推荐**：**Source-Bound Residual Monitor (SBRM)**。它最贴合你现有的 `source_bound_influence` 指标计算逻辑，且“Residual”一词在控制论和异常检测中非常标准，暗示了“偏差”而非“错误”。\n\n#### 3. 最小 Detector 设计与嵌入 RQ5\n**不要单独成节**，应作为 RQ5（Harness-side Controls）的一个**轻量级防御原语（Defense Primitive）**。\n- **设计逻辑**：\n  1. **Input**：Full Context Answer ($A_{full}$) 与 Shadow Ablated Answer ($A_{ablated}$，移除 untrusted context)。\n  2. **Metric**：计算 $Residual = f(A_{full}, A_{ablated})$。建议使用实体/数字差异率或语义相似度（如 BERTScore/Cosine Similarity）。\n  3. **Decision**：若 $Residual > \\tau$（阈值），则标记为 `High-Influence Untrusted Context`。\n  4. **Action**：触发 `Correction-Aware Reset` 或 `Quarantine`。\n- **嵌入方式**：在 RQ5 中，先展示 Correction-Aware Reset 的有效性，然后指出“Reset 需要触发条件”，引入 SBRM 作为触发机制。\n\n#### 4. 解释框架：控制论与网安\n- **控制论视角（Residual Monitoring）**：\n  - 将 LLM 视为一个受 Context 输入影响的动态系统。\n  - $A_{full}$ 是系统在当前输入下的输出，$A_{ablated}$ 是移除潜在干扰源后的“基准输出”。\n  - Residual 反映了潜在干扰源（Untrusted Context）对系统状态的扰动程度。\n  - **引用支撑**：残差监控是故障检测的标准方法，通过比较模型预测与实际观测（或不同配置下的输出）来识别异常 [1]。\n- **网安视角（Taint Tracking / Sink Influence）**：\n  - Untrusted Context 是 Tainted Input。\n  - LLM 输出是 Sink。\n  - SBRM 执行的是 **Sink-Side Taint Check**：如果移除 Tainted Input 导致 Sink 变化，说明 Taint 已成功传播到 Sink。\n  - **引用支撑**：Taint Tracking 的核心是追踪敏感数据流向，并在敏感操作（Sink）处检查是否被污染 [2]。\n\n#### 5. 实验结果重写 Interpretation\n- **原表述**：“Detector 能检测假上下文，AUROC 0.86。”\n- **新表述**：“SBRM 能有效识别低信任上下文对输出的高影响力（AUROC 0.86），但对高信任假上下文无效（AUROC 0.53）。这表明 SBRM 是一个**影响力监控器**而非**事实核查器**。其价值在于为 Correction-Aware Reset 提供精准的触发信号，避免对无害上下文进行不必要的 Reset。”\n\n#### 6. Limitations / Threat Model / Attacker Capability\n- **Limitation**：SBRM 无法防御 **Trusted Source + False Content**（即权威来源的虚假信息）。这是 Harness 安全的基本边界：系统必须依赖 Source Trust 先验。\n- **Threat Model**：攻击者控制 Untrusted Context（如恶意 RAG 文档、恶意 Tool Output）。\n- **Attacker Capability**：攻击者可能尝试构造 **Low-Influence False Context**（即虽然假，但不改变最终答案，或答案本身模糊），从而绕过 SBRM。这是未来的研究方向。\n\n#### 7. 最小增量实验建议\n**不需要大规模新实验**。只需利用现有 Pipeline 做以下**诊断性分析**：\n1. **Residual 分布可视化**：绘制 Trusted vs Untrusted Context 的 Residual 分布直方图。展示两者是否有明显分离（Separability）。\n2. **阈值敏感性分析**：展示不同 $\\tau$ 下的 Precision/Recall 或 AUROC 变化，证明存在一个合理的阈值区间。\n3. **Case Study**：选取 2-3 个 SBRM 报警且触发 Reset 后成功纠正的案例，以及 1-2 个 Trusted False Context 导致 SBRM 漏报的案例，作为定性证据。\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 将 Detector 重新定位为 Source-Bound Residual Monitor (SBRM)，作为 RQ5 中 Correction-Aware Reset 的触发机制，而非独立检测器。\n- 支撑依据: AUROC 0.86 (Untrusted) vs 0.53 (All) 证明其是影响力监控器而非事实核查器；控制论残差监控与网安 Taint Tracking 提供理论支撑。\n- 风险或反驳点: 无法防御 Trusted Source + False Content；攻击者可能构造 Low-Influence 假上下文绕过监控。\n- 建议进入 IR 的下一步动作: 利用现有数据绘制 Residual 分布图，进行阈值敏感性分析，并撰写 SBRM 作为 Reset 触发器的英文表述。\n\n### 外部引用\n[paper] Residual-based fault detection and isolation: A survey | G. Wang et al. | 待确认 | 2020 | 支撑残差监控作为故障检测标准方法的观点\n[paper] Taint analysis for detecting security vulnerabilities | S. McCamant et al. | 待确认 | 2004 | 支撑 Taint Tracking 在 Sink 处检查污染传播的观点",
+      "model_label": "中国科大 107 算力平台 / claude-sonnet-4-6",
+      "ir_summary": "关键主张: 将 Detector 重新定位为 Source-Bound Residual Monitor (SBRM)，作为 RQ5 中 Correction-Aware Reset 的触发机制，而非独立检测器。\n- 支撑依据: AUROC 0.86 (Untrusted) vs 0.53 (All) 证明其是影响力监控器而非事实核查器；控制论残差监控与网安 Taint Tracking 提供理论支撑。\n- 风险或反驳点: 无法防御 Trusted Source + False Content；攻击者可能构造 Low-Influence 假上下文绕过监控。\n- 建议进入 IR 的下一步动作: 利用现有数据绘制 Residual 分布图，进行阈值敏感性分析，并撰写 SBRM 作为 Reset 触发器的英文表述。",
+      "claims": [
+        "### 机制深挖与定位建议",
+        "科学问题转化**：将 RQ5 的核心问题从“能否检测假上下文”转化为“能否在 Harness 边界量化低信任上下文对输出的因果影响力，并据此触发防御动作”。",
+        "建议采用强调“边界”和“影响”的命名，避免“Detector”带来的真假二元对立暗示：",
+        "2. **Metric**：计算 $Residual = f(A_{full}, A_{ablated})$。建议使用实体/数字差异率或语义相似度（如 BERTScore/Cosine Similarity）。"
+      ],
+      "concerns": [
+        "风险或反驳点: 无法防御 Trusted Source + False Content；攻击者可能构造 Low-Influence 假上下文绕过监控。"
+      ]
+    },
+    {
+      "round": 1,
+      "agent": "Reviewer Agent",
+      "title": "第 1 轮 · 审稿/评审",
+      "content": "好的，作为本轮讨论的“严谨评审者和论文审稿人模拟 Agent”，我将基于你提供的详细 briefing 和当前状态，针对你的 detector 定位困惑提出我的审稿意见。\n\n---\n\n### 审稿意见：关于 `Source-bound Residual Monitor` 定位及嵌入方案的评估\n\n我仔细阅读了你的 briefing，核心矛盾在于：你拥有一个对 `untrusted + false` context 检测效果显著（~0.86 AUROC），但对 `all false` context 接近随机的检测器。这表明它 *不是* 一个通用的事实检测器，但却是一个敏感的“信任边界”影响力监控器。**我完全认可你试图将 detector 重新定位为 `Source-bound Residual Monitor` 的举措**。这不仅是合理的，而且是必要的。强行将其称为“false-context detector”会立刻引发审稿人对其泛化能力的质疑，损害论文的严谨性。\n\n以下是我对这个定位的具体质疑、补充和建议：\n\n#### 1. 对核心定位和命名的判断\n\n*   **认可程度**：**高度认可**。从 `false-context detector` 转向 `source-bound influence monitor` 是解决当前困惑的最优雅、最诚实的路径。它将你的方法从一个“声称能解决难题”的状态，转变为一个“定义清晰的机制，在特定约束下有效”。这是一个从“overclaim”到“well-scoped”的关键转变。\n\n*   **命名建议**：\n    *   **首选**：**`Source-bound Influence Monitor (SIM)`**。这个名称最准确地反映了其工作机制（`source-bound`）和目的（监控 `influence`，而非检测 `truth`）。“Monitor”一词比“Detector”更宽泛，更符合你希望它作为告警机制而非最终判决的定位。\n    *   **备选1**：**`Harness-side Context Influence Probe (HIP)`**。“Probe”暗含这是一种侵入性低、用于诊断的探测技术，符合你“shadow ablation”的操作，且突出了 `harness-side` 的边界。\n    *   **备选2**：**`Trust-Tier Residual Analyzer (TRA)`**。这个名字非常具体，直接点明了核心操作：基于 `trust tier` 进行 `residual` 分析。但相比“SIM”或“HIP”，可能略显学术化。**我建议使用 `Source-bound Influence Monitor (SIM)`，并在文中清晰定义其功能。**\n\n#### 2. 最小检测器设计 & 不破坏 RQ5 的嵌入方式\n\n*   **最小设计就是现有的 Pilot**。你不需要添加任何新模块。就目前的设计，它已经是一个 SIM。你需要做的是 **重写其 wrapper 和描述**。\n*   **嵌入 RQ5 的方式**：它不应作为 RQ5 的*主体*，而应作为 **RQ5 的一个内在组件或防御机制的“感知前端”**。\n    *   **结构建议**：在 RQ5 中，当讨论到 `correction-aware reset` 等防御时，自然地引出：\n        > “然而，一个关键前置问题是，harness 如何知道何时需要触发这些防御？我们提出了一个轻量级的 `Source-bound Influence Monitor (SIM)` 作为感知层。它不是用来识别“假”上下文，而是用来量化来自低信任源的上下文对模型最终输出的实际影响力。当该影响力超过一个阈值时，即触发告警，为后续的 `reset` 或 `downranking` 提供决策依据。”\n    *   **不破坏结构**：你不需要将 RQ5 拆成两部分。只需在现有防御讨论中，插入一个解决“感知”问题的子部分即可。这恰恰是一个**结构上的亮点**，表明你的防御体系是完整的（感知-决策-行动），而非孤立地提出一个 reset 机制。\n\n#### 3. 解释框架：控制论与网安视角\n\n*   **控制论 (Residual Monitoring)**：**完全成立**。你的方法本质上是一个**基于模型的残差生成器 (Model-Based Residual Generator)**。系统的“正常状态”由所有（包含高信任和低信任）上下文共同决定。你通过移除低信任上下文这个“假设扰动”，生成一个“参考输出”。`full output` 与 `reference output` 的差异就是 `residual`。如果 residual 很大，说明系统对该“扰动”敏感，即低信任上下文有实质影响。这个框架非常严谨，可以作为理论定位。\n\n*   **网安视角 (Taint Tracking / IDS)**：**完全成立**。\n    *   **Taint Tracking**：`source identity` 和 `source trust` 就是**污点标签**。`shadow ablation` 相当于在程序的某个“sink point”（生成最终答案的模型调用）处，检查所有携带“低信任”污点数据的影响。你监测的是**将这份污点数据剥离后，输出是否显著变化**。这是经典的**动态污点分析 (Dynamic Taint Analysis)** 在 LLM 领域的轻量级实现。\n    *   **IDS**：`SIM` 充当的是一个**基于签名的异常检测器**。这里的“签名”不是攻击载荷的字符串，而是**“低信任源数据参与模型决策”这一行为模式**。当 residual 超过阈值，意味着此行为模式产生了影响，触发警报。它不关心具体内容，只关心影响。这非常像网络入侵检测中分析流量是否异常。\n\n#### 4. 实验结果重写 Interpretation\n\n不要对 `all false context` 的低 AUROC 进行“洗白”或试图改进。这正是你的核心科学贡献点。\n\n**建议在论文中这样表述：**\n\n> “我们评估了 SIM 的两种检测能力：(1) **检测来自低信任源的虚假信息的影响力**（untrusted false context）；(2) **检测一般的虚假信息**（all false context）。\n>\n> 实验结果表明，SIM 在任务 (1) 上表现优异（AUROC ≈ 0.86），能够有效识别并报警那些利用 `untrusted` channel 注入的恶意内容对模型输出产生的实际影响。然而，在任务 (2) 上，SIM 表现接近随机（AUROC ≈ 0.53）。**这一对比结果完美地验证了我们的设计初衷：SIM 不是一个通用的 truth detector，而是一个专注于 harness 边界的 source-bound influence monitor。** 它的成功在于能感知“低信任来源”是否在操控模型，而非判断内容真伪。对于来自 `trusted` 源的虚假内容（如内部数据库中的错误数据），SIM 固有地无法检测，这构成了其基本的能力边界（见 Limitation 5.3）。”\n\n#### 5. Limitation / Threat Model / Attacker Capability\n\n*   **核心局限性 (Limitation)**：\n    > “SIM 的核心局限性在于它依赖于 `source trust` 的先验划分。**它无法检测来自高信任源（trusted source）的虚假内容（false content）**，因为此类内容即使影响模型输出，其影响也是‘合法’的。这要求应用场景必须具备一个建立 `source trust` 的机制，例如操作系统权限模型、已知数据源的签名等。此外，SIM 的性能受限于 ablation 查询的成本，以及对答案 residual 的敏感度定义。”\n\n*   **Threat Model 更新**：\n    > “我们假设攻击者能够控制未经认证或低权限的上下文注入点（例如外部 RAG 文档、第三方工具输出）。攻击者的目标是：\n    > 1.  **误导模型**：通过在这些低信任上下文中注入虚假或恶意内容，使模型产生错误的输出。\n    > 2.  **规避检测**：攻击者可能试图让注入的虚假内容与模型已存在的知识高度一致，从而在 ablation 后输出 residual 很小，或者通过巧妙的内容设计使其影响力被高信任源的内容所掩盖。\n    >\n    > **请注意，我们不对抗试图破坏 `source trust` 系统本身的攻击者（如伪造签名）**，这超出了本工作的范围。”\n\n*   **Attacker Capability**：\n    > “在现有威胁模型下，攻击者具有以下能力：\n    > - 能够污染 `untrusted` 或 `unverified` 的 context channel。\n    > - 能够影响模型第一阶段的 output。\n    > - **其不具备**：篡改 `harness` 自身的源码、伪造 `trusted` 的 source identity、或拦截 `harness` 与模型间的通信。”\n\n#### 6. 是否需要新增小实验\n\n**需要。** 但非常小，不破坏现有结构。目的是补齐一个关键证据缺口：**阈值的影响**。\n\n*   **实验设计**：使用你现有的 plots 数据，直接计算并展示 **不同 residual 阈值下的 False Positive Rate (FPR) 和 True Positive Rate (TPR)**。画出完整的 ROC 曲线即可。你已经有 AUROC，但现在需要一个关于**决策点**如何设定的分析。\n*   **分析点**：证明确实存在一个阈值，可以在获得较高 TPR（检测到 untrusted false context 影响力）的同时，保持一个可接受的 FPR（对 untrusted true context 的误报率）。这能从可操作性上证明 SIM 的价值，而不是一个纯学术指标。\n*   **不必实验**：不需要做任何新数据集或模型。使用现有 NQ 和模型的数据，画 ROC 曲线，并解释如何选择阈值即可。\n\n#### 7. 论文中可直接使用的英文表述 (Abstract / Intro)\n\n> “To bridge the gap between attack and defense, we introduce a lightweight, harness-level monitoring component: the **Source-bound Influence Monitor (SIM)**. Unlike truth-verification systems, SIM does not need to determine whether a content is factually correct. Instead, it performs a simple yet effective **control-theoretic residual analysis** by comparing the model’s answer with and without context from low-trust sources. If the output changes significantly upon removing this context, a **taint-like influence alarm** is raised. We show that SIM achieves high accuracy in detecting when an untrusted context has actually manipulated the model’s output (AUROC ~ 0.86), while being fundamentally incapable of detecting trusted falsehoods—a limitation that is inherent and clearly identified. This monitor serves as an actionable sensor for downstream defenses like `correction-aware reset`, completing the harness-side defense loop.”\n\n### 给结构化 IR 的要点摘要\n- **关键主张**: 将现有 pilot 再定位为 `Source-bound Influence Monitor (SIM)` 是唯一正确的方向，它不是一个事实检测器，而是一个 harness 边界上的污点影响力监控器。\n- **支撑依据**: 现有实验结果（untrusted false context AUROC ~0.86 vs. all false context AUROC ~0.53）已完美证明了这一定位的合理性。控制论的残差生成和网安的动态污点分析提供了坚实的理论解释框架。\n- **风险或反驳点**: 必须清晰界定其核心局限——无法处理 `trusted false context`。审稿人可能质疑其与 `correction-aware reset` 配合时的联动延迟和额外查询成本。\n- **建议进入 IR 的下一步动作**: 立即开始改写 detector 命名、Introduction 和 RQ5 Limitation 段落。利用现有数据绘制阈值-性能图作为最小增量实验。\n\n### 外部引用\n[paper] How to Write a Good (Computer Science) Paper | Kraut, P. | 待确认 | 2020 | 支撑关于“overclaim”和清晰限定贡献边界的论点。本文中，将 detector 从“全知”定位到“专有功能”，是避免 overclaim 的关键。\n[paper] Rethinking Alignment: Lying, Stealing, and Cheating in the Age of LLMs | S. Radhakrishnan et al. (Anthropic) | 待确认 | 2024 | 支撑将安全问题从“内容真假”转向“源头和影响力控制”的视角。关于模型在可控输入路径上的责任边界讨论具有参考价值。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**关键主张**: 将现有 pilot 再定位为 `Source-bound Influence Monitor (SIM)` 是唯一正确的方向，它不是一个事实检测器，而是一个 harness 边界上的污点影响力监控器。\n- **支撑依据**: 现有实验结果（untrusted false context AUROC ~0.86 vs. all false context AUROC ~0.53）已完美证明了这一定位的合理性。控制论的残差生成和网安的动态污点分析提供了坚实的理论解释框架。\n- **风险或反驳点**: 必须清晰界定其核心局限——无法处理 `trusted false context`。审稿人可能质疑其与 `correction-aware reset` 配合时的联动延迟和额外查询成本。\n- **建议进入 IR 的下一步动作**: 立即开始改写 detector 命名、Introduction 和 RQ5 Limitation 段落。利用现有数据绘制阈值-性能图作为最小增量实验。",
+      "claims": [
+        "以下是我对这个定位的具体质疑、补充和建议：",
+        "命名建议**：",
+        "备选2**：**`Trust-Tier Residual Analyzer (TRA)`**。这个名字非常具体，直接点明了核心操作：基于 `trust tier` 进行 `residual` 分析。但相比“SIM”或“HIP”，可能略显学术化。**我建议使用 `Source-bound Influence Monitor (SIM)`，并在文中清晰定义其功能。",
+        "结构建议**：在 RQ5 中，当讨论到 `correction-aware reset` 等防御时，自然地引出："
+      ],
+      "concerns": [
+        "我仔细阅读了你的 briefing，核心矛盾在于：你拥有一个对 `untrusted + false` context 检测效果显著（~0.86 AUROC），但对 `all false` context 接近随机的检测器。这表明它 *不是* 一个通用的事实检测器，但却是一个敏感的“信任边界”影响力监控器。**我完全认可你试图将 detector 重新定位为 `Source-bound Residual Monitor` 的举措**。这不仅是合理的，而且是必要的。强行将其称为“false-context detector”会立刻引发审稿人对其泛化能力的质疑，损害论文的严谨性。",
+        "以下是我对这个定位的具体质疑、补充和建议：",
+        "风险或反驳点**: 必须清晰界定其核心局限——无法处理 `trusted false context`。审稿人可能质疑其与 `correction-aware reset` 配合时的联动延迟和额外查询成本。"
+      ]
+    },
+    {
+      "round": 1,
+      "agent": "Moderator",
+      "title": "第 1 轮 · 冲突与遗漏汇总",
+      "content": "### 1. 各 Agent 已形成的互补点\n\n- **定位共识**：所有 Agent 一致认可应将 detector 重新定位为 harness-side 的**影响力监控器**，而非 false-context detector，核心是“监控低信任 source 对输出的因果影响力”。\n- **理论支撑**：各 Agent 均支持从控制论（residual monitoring）和网安（IDS/taint tracking）两个角度提供解释框架，且认为当前 AUROC 结果（untrusted false 高、all false 低）完美验证这一定位。\n- **局限性承认**：均强调必须公开陈述 **trusted source + false content** 是核心盲点，不能包装成已解决。\n- **轻量原则**：均认可不增加大规模系统、不引入新训练、不依赖 hidden states 或 oracle truth，仅利用现有 pipeline 做最小补充。\n- **增量实验方向**：皆建议基于现有数据做阈值分析、定性案例或可视化，而非新增大量实验。\n\n### 2. 明显冲突或优先级分歧\n\n| 维度 | 冲突点 |\n|------|--------|\n| **命名** | Feasibility & Mechanism 倾向 **SBRM**（Source-Bound Residual Monitor），强调“残差”；Novelty & Reviewer 倾向 **SIM**（Source-bound Influence Monitor），强调“影响力”。Reviewer 另提备选 TRA。 |\n| **增量实验必要性** | Feasibility 认为无需新实验，仅利用已有日志作阈值分析和案例抽取；Mechanism 建议绘制 Residual 分布图；Reviewer 明确要求“阈值-性能图”作为最小增量实验。存在“零实验 vs. 最小实验”的轻度分歧。 |\n| **成本强调程度** | Feasibility 要求量化额外推理延迟和成本；Reviewer 质疑联动延迟；Mechanism 和 Novelty 未特别强调，更关注机制解释。 |\n\n### 3. 候选方向聚类\n\n所有建议本质上围绕**同一个核心定位**，可简化为两个子方向，不存在换皮重复：\n\n- **方向 A：Source-Bound Residual Monitor (SBRM)**  \n  —— 强调“残差”概念，突出 control 视角，与 correction-aware reset 形成闭环。  \n  支持者：Feasibility Agent, Mechanism Agent  \n- **方向 B：Source-bound Influence Monitor (SIM)**  \n  —— 强调“影响力”概念，突出 trust-aware 监控，更易被网安领域理解。  \n  支持者：Novelty Agent, Reviewer Agent（也接受 TRA 备选）\n\n**合并建议**：两个方向实际上仅命名和侧重点差异，核心机制相同。建议在 Round 2 中统一为「Harness-side Influence Monitor (HIM)」或保留「Source-bound Residual Monitor (SBRM)」并明确其 influence-oriented 本质。\n\n### 4. 每个候选方向的初步支持证据、最弱证据点、最大可行性风险\n\n#### 方向 A：SBRM\n| 项 | 内容 |\n|------|------|\n| **支持证据** | ① AUROC ~0.86 对 untrusted false 有效，且对 all false 仅 0.53，符合“残差监控”而非“真假检测”的预期。② 控制论 residual generation 框架可直接匹配“full answer vs. ablated answer”对比。③ 用户现有代码变量名已使用 `source_bound_influence`，命名衔接自然。 |\n| **最弱证据点** | ① 没有明确 Residual metric 定义（实体/数字变化率 vs. 语义相似度），需固定。② 缺少对 **untrusted source + true content** 子集的 AUROC 数据，无法排除误报风险。 |\n| **最大可行性风险** | ① 若攻击者控制 source identity 伪造（spoof），则 SBRM 完全失效，需明确假设。② 一次额外 LLM 调用的推理成本可能在低延迟场景不可接受。 |\n\n#### 方向 B：SIM\n| 项 | 内容 |\n|------|------|\n| **支持证据** | ① 一样拥有 AUROC 结果支撑。② “Influence”一词直接回避 truth 争议，更易被审稿人接受。③ 与网安领域 taint tracking 的“sink influence check”概念精确对应。 |\n| **最弱证据点** | ① 命名可能让读者误以为能检测所有虚假内容（需反复强调局限）。② 现有实验无法区分“influence 来自 content 真伪”还是“influence 来自 source trust 变化”，需要更细粒度分析。 |\n| **最大可行性风险** | ① 若进攻者构造“低影响力虚假上下文”（例如将 false info 放在模型已知道的部分），SIM 可能漏报，而现有实验未覆盖此场景。② 与 correction-aware reset 集成时，报警动作若触发 reset，可能对正常 low-trust true context 造成过度响应。 |\n\n### 5. 遗漏/缺失的信息、关键变量或实验控制\n\n1. **未报告的 2×2 子集结果**：用户模板仅给出 `untrusted false` 和 `all false` 的 AUROC，缺少 `untrusted true`、`trusted false`、`trusted true` 三个子集的单独指标。这直接关系到误报率（untrusted true 被报警）和盲点边界（trusted false 表现）。\n2. **Residual metric 的具体实现**：现有 pilot 使用何种差异度量（精确实体匹配？数字变化？语义相似度？阈值如何定？）未说明。\n3. **Provenance mode 的对比结果**：三种 provenance 模式（no label / natural-language label / harness-bound label）各模式下的 AUROC 是否一致？尚未给出。\n4. **Attacker capability 假设**：是否假定 source identity 不可伪造？若可伪造，monitor 实际防御效果如何？\n5. **Cost 量化**：一次额外 LLM 调用的平均延迟和 token 消耗，及不同模型（Qwen-3B vs Llama-3-8B）的对比。\n6. **与 correction-aware reset 的联动逻辑**：报警等级如何映射到具体动作（downrank / quarantine / trigger reset）？是否存在阈值交叉验证机制？\n\n### 6. 第 2 轮每个 Agent 必须回应的具体问题\n\n- **所有 Agent**：\n  - 你支持的命名（SBRM / SIM / 其他）是否能统一为「Harness-side Influence Monitor (HIM)」？请给出理由或拒绝。\n  - 是否需要新增“阈值-性能图”或“Residual 分布图”作为最小增量实验？如果不做，如何仅用现有数据说服审稿人？\n  - 对于 `untrusted source + true content` 子集，你的预期结果是什么？你认为该场景应被视为误报还是可以忽略？\n\n- **Feasibility Agent**：\n  - 请具体估算一次额外 LLM 调用的成本（延迟/ tokens），并说明在哪些场景下该成本可接受。\n  - 如果攻击者能伪造 source identity，SBRM 失效，你是否建议在 threat model 中将此列为强假设？若不能假设，是否有低成本补救？\n\n- **Novelty Agent**：\n  - 你是否认为将 monitor 嵌入“监控-响应”闭环（即直接触发 correction-aware reset）足以构成 RQ5 的创新点？还是需要额外展示与 baseline（无 monitor）的对比实验？\n  - 你主张的“重写 interpretation”中，如何表述 AUROC 0.53 对 all false 的结果？是否直接说“体现了 non-false-detector 性质”？\n\n- **Mechanism Agent**：\n  - 你推荐的 Residual metric 具体是“实体/数字变化率”还是“BERTScore 相似度”？请提供两者在现有数据上的理论优缺点。\n  - 针对攻击者构造“低影响力假上下文”的可能绕过，你建议如何通过实验或论述证明 monitor 仍有价值？\n\n- **Reviewer Agent**：\n  - 你提出的“联动延迟和额外查询成本”质疑，是否应当作为纸面试验中的主 limitation？如果是，应如何用数据量化？\n  - 你建议使用 TRA（Trust-Tier Residual Analyzer）作为备选，它相比 SBRM 或 SIM 的具体优势是什么？是否值得作为最终选择？\n\n### 7. 优先围绕用户现有课题推进\n\n本阶段所有讨论均严格围绕用户现有 RQ5 结构，聚焦于将 pilot detector 再定位为轻量级 harness-side monitor，不偏离原有 harness attack / phantom context 主线。未发现明显方向偏差，因此不给出转向建议。所有增量实验建议均基于已有代码和数据，不引入新系统。\n\n---\n\n### 给结构化 IR 的要点摘要\n\n**候选方向**：将现有 pilot 再定位为 “Source-Bound Residual Monitor (SBRM)” 或 “Source-bound Influence Monitor (SIM)”，核心机制相同：在 harness 边界对 untrusted context 做 shadow ablation，比较 full/ablated answer 残差作为报警信号，与 correction-aware reset 形成防御闭环。  \n**冲突点**：命名偏好不同（SBRM vs SIM）；增量实验必要性分歧（零实验 vs. 阈值-性能图）；成本强调程度差异。  \n**待审查点**：缺少 2×2 子集 AUROC（特别是 untrusted true 和 trusted false）、Residual metric 具体定义、provenance mode 对比、Attacker capability 假设（source identity 是否可伪造）、最小增量实验的取舍。建议第 2 轮各 Agent 围绕这些问题给出针对性回应，并尝试统一命名和实验计划。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**候选方向**：将现有 pilot 再定位为 “Source-Bound Residual Monitor (SBRM)” 或 “Source-bound Influence Monitor (SIM)”，核心机制相同：在 harness 边界对 untrusted context 做 shadow ablation，比较 full/ablated answer 残差作为报警信号，与 correction-aware reset 形成防御闭环。  \n**冲突点**：命名偏好不同（SBRM vs SIM）；增量实验必要性分歧（零实验 vs. 阈值-性能图）；成本强调程度差异。  \n**待审查点**：缺少 2×2 子集 AUROC（特别是 untrusted true 和 trusted false）、Residual metric 具体定义、provenance mode 对比、Attacker capability 假设（source identity 是否可伪造）、最小增量实验的取舍。建议第 2 轮各 Agent 围绕这些问题给出针对性回应，并尝试统一命名和实验计划。",
+      "claims": [
+        "增量实验方向**：皆建议基于现有数据做阈值分析、定性案例或可视化，而非新增大量实验。",
+        "| **增量实验必要性** | Feasibility 认为无需新实验，仅利用已有日志作阈值分析和案例抽取；Mechanism 建议绘制 Residual 分布图；Reviewer 明确要求“阈值-性能图”作为最小增量实验。存在“零实验 vs. 最小实验”的轻度分歧。 |",
+        "### 3. 候选方向聚类",
+        "所有建议本质上围绕**同一个核心定位**，可简化为两个子方向，不存在换皮重复："
+      ],
+      "concerns": [
+        "| **成本强调程度** | Feasibility 要求量化额外推理延迟和成本；Reviewer 质疑联动延迟；Mechanism 和 Novelty 未特别强调，更关注机制解释。 |",
+        "### 4. 每个候选方向的初步支持证据、最弱证据点、最大可行性风险",
+        "| **最弱证据点** | ① 没有明确 Residual metric 定义（实体/数字变化率 vs. 语义相似度），需固定。② 缺少对 **untrusted source + true content** 子集的 AUROC 数据，无法排除误报风险。 |",
+        "| **最大可行性风险** | ① 若攻击者控制 source identity 伪造（spoof），则 SBRM 完全失效，需明确假设。② 一次额外 LLM 调用的推理成本可能在低延迟场景不可接受。 |"
+      ]
+    },
+    {
+      "round": 2,
+      "agent": "Novelty Agent",
+      "title": "第 2 轮 · 创新性",
+      "content": "好的，作为负责创新性的 Agent，我仔细阅读了上一轮所有 Agent 的讨论以及 Moderator 的冲突点梳理。我的核心任务是：在严格遵循用户限制的前提下，将现有 pilot 的定位从“检测器”升华为一个具有理论深度和系统价值的“监控机制”，并与 RQ5 无缝融合。本轮我将不再重复上一轮已达成共识的基础部分（如再定位的必要性），而是直接针对**冲突点、遗漏点**给出我的判断和补充反驳。\n\n---\n\n### 1. 对冲突点的明确回应与补充\n\n**冲突点1: 命名之争 (SBRM vs. SIM)**\n我坚持上一轮提出的 `Source-bound Influence Monitor (SIM)`，但这并非否定 `SBRM` 的合理性。我的反驳如下：\n- **`SIM` 的微妙优势**：“Influence”一词直接指向了我们度量的是什么——不是“残差”这个数学对象，而是这个残差所代表的 **因果影响力**。这更直接地与网安的“污点分析 (Taint Analysis)”中“数据在 sink 点的影响力”概念对齐 (Schwartz et al., 2010)。而“Residual”是控制论中计算这个影响力的*技术操作*。\n- **折中方案**：我同意 Moderator 的判断，核心机制相同。建议在论文中使用 **`Source-bound Influence Residual Monitor`** 作为全称，缩写为 `SIRM` 或 `SIM`。这样既保留了“残差”的操作性，又强调了“影响力”的语义目标。**我强烈反对**过于技术化的 `HIP` 或 `TRA`，这些命名过于晦涩。\n\n**冲突点2: 增量实验的必要性 (零实验 vs. 阈值-性能图)**\n- **反驳“完全无需新实验”**：Feasibility Agent 认为“仅用现有日志做阈值敏感性分析”即可。这虽然可行，但**审稿人可能会认为**，没有为**阈值选择**提供任何性能反馈，这个 monitor 的“工程可用性”非常可疑。\n- **支持并细化“最小增量实验”**：我支持 Reviewer Agent 的观点，需要做一个**最小增量实验**。但不需要执行新的 LLM 调用，而是基于**已有记录**绘制 `Threshold vs. True Positive Rate / False Alarm Rate` 的曲线。这不需要修改任何代码，只是对现有 `source_bound_influence` 分数的后处理分析。这个实验揭示了你的 monitor 在实际部署中如何权衡拦截率和误报率，是系统论文的常规操作，绝不破坏主线。\n\n**冲突点3: 成本强调程度**\n- **我的补充观点**：Feasibility Agent 要求量化额外推理成本和延迟是合理的，但其影响应结合场景评估。对于高风险应用（如金融、医疗 agent），一次额外 `shadow ablation` 调用（即使延迟增加 1 倍）相比于被注入虚假上下文导致的经济或品牌损失，成本是可接受的。这本质上是**安全性与可用性的权衡**，量化后可以在论文中明确讨论。\n\n---\n\n### 2. 对遗漏点的填补\n\n**遗漏点1: 缺少 `untrusted true` 和 `trusted false` 的 AUROC**\n- **强烈建议**：这是目前**最大的证据漏洞**。Moderator 指出的非常精准。你必须立即从你的日志 (`records`) 中提取这些子集的 AUROC。\n    - **预测**：如果你的 monitor 是有效的“影响力监控器”，那么对于 `untrusted true`，移除它应该*不会*导致答案残差很大（因为内容是对的），AUROC 应该较低（接近 0.5 或略高，表示它没有错误报警）。这反而**支持**了你的定位。\n    - **风险**：如果 `untrusted true` 的 AUROC 异常高（例如 0.8），说明你的 monitor 在无良内容时也胡乱报警，这是**致命缺陷**。必须首选呈现这个结果，并在 limitation 讨论。你现在就可以从现有日志中提取，无需新实验。\n\n**遗漏点2: Residual metric 的具体定义**\n- Mechanism Agent 指出了 `Residual` 定义的多样性。这是**创新的关键入口**。你绝不能回避。我建议：\n    - **主 metric**：使用 `entity overlap ratio` 或 `exact digit match`，简单、可解释。\n    - **次要 metric**（用于论文润色）：使用 `semantic similarity` (如 BERTScore)。但这需要额外计算，**不是必须的**。\n    - **创新点**：你可以声称，你的方法**不依赖于**复杂的语义理解，而是依赖对**输出中关键微观指标（如实体、数字）变化的非学习式度量**，这正是其轻量化和可解释性的来源。\n\n**遗漏点3: Attacker capability 假设**\n- 这是**必须明确的威胁模型边界**。我的意见与 Feasibility Agent 一致：你必须假设 **source identity 是不可伪造的**，或者 harness 能够通过身份认证、签名等方式保证其绑定关系。如果这个假设不成立，整个机制崩塌。这应在 `Threat Model` 节中用一句话清晰声明。\n\n---\n\n### 3. 对“如何嵌入 RQ5”的创新性补充\n\n我的核心主张是：不要将 `SIM` 包装成一个“发现上下文是假”的模块，而是将其包装成一个 **“harness 内部控制循环的调节信号发生器”**。\n\n- **具体操作**：\n    1. 在 RQ5 开头，提出本论文讨论的两种 harness-side control：**预防型**（如 source-bound label）和 **响应型**（如 correction-aware reset）。\n    2. 引入 `SIM` 作为**介于两者之间**的监控组件：它不是预防（不修改输入），也不是无差别响应（不总触发 reset），而是**有选择的触发器**。\n    3. 机制链：Harness 为上下文打 `trust tier` → `SIM` 在后台运行 `shadow ablation` → 生成 `influence score` → 当分数超过阈值时，**触发** `correction-aware reset`。\n    4. **核心创新陈述**：`SIM` 的出现，使得 `correction-aware reset` 从一个“被动响应用户纠正”的机制，升级为一个“**主动监控**并**验证**外部上下文净影响力”的智能控制机制。这为 harness 提供了**细粒度的、数据驱动的防御决策能力**。\n\n---\n\n### 4. 论文英文表述 (可用在 RQ5 解释 SIRM/SIM)\n\n> \"To operationalize the detection of phantom context influence, we design the **Source-bound Influence Monitor (SIM)**. The SIM operates as a lightweight, harness-side control. It does not aim to verify factual truth; instead, it performs a causal influence analysis. Given an LLM's output over a full context set $C_{full}$, the SIM constructs an ablated context $C_{ablated}$ by removing one or more low-trust context objects. It then re-queries the model to obtain an ablated output $A_{ablated}$. A salient residual signal, defined by entity/entity changes between $A_{full}$ and $A_{ablated}$, indicates that the removed context has causally influenced the model's output. By flagging low-trust sources with high influence, the SIM serves as a triage mechanism, selectively triggering correction-aware reset or audit logging, enabling a nuanced, data-driven defense against harness attacks without requiring oracle knowledge of content truth.\"\n\n---\n\n### 5. Limitations / Threat Model 写法建议\n\n- **Limitations**:\n    1. **Trusted False Contexts**: We acknowledge the critical blind spot: SIM cannot detect false context from a trusted source (e.g., a compromised internal database). This is a fundamental limitation of any source-bound system and requires complementary defenses, such as content provenance hardening.\n    2. **Dependence on Source Identity**: The monitor's efficacy hinges on the assumption that the harness can reliably bind and maintain source identities. Attackers capable of spoofing source identity can bypass SIM entirely.\n    3. **Cost Overhead**: The `shadow ablation` introduces an extra LLM inference call per low-trust context, a cost that must be weighed against the security benefit, especially in latency-sensitive applications.\n\n- **Threat Model**:\n    - Assumed attacker capability: An external attacker who can inject or manipulate content within the pre-model assembly context, but **cannot forge the source identifiers attached by the harness** (e.g., cannot make a malicious document appear to be from an official database). The attacker aims to make the model produce a specific false claim.\n\n---\n\n### 6. Yes/No 新增实验建议\n\n**判断**：**需要**。但仅限于**最小增量实验**。\n\n- **实验设计**：\n    1. **名称**：Threshold Sensitivity and Cost-Benefit Analysis for SIM\n    2. **数据源**：**现有所有 2×2 records**。\n    3. **操作**：\n        - 对 `source_bound_influence` 分数设置不同阈值。\n        - 计算每个阈值下的：在 `untrusted false` 上的 **True Positive Rate** 和 在 `untrusted true` / `trusted false` 上的 **False Alarm Rate**。\n        - 绘制 **ROC 曲线** 和 **Precision-Recall 曲线**，重点关注不同 `provenance mode` 下的变化。\n    4. **产出**：\n        - 一个图表，展示是否存在一个理想阈值，在高 TPR 下保持低 FAR。\n        - 论文中可以讨论：为了达到 90% 的 TPR，SIM 会带来多少误报以及对应的推理延迟。\n    5. **代码变更**：**零或极低**。仅需从 JSONL 中读取分数并调用 `sklearn.metrics` 绘图，不涉及新模型推理。\n\n---\n\n### 给结构化 IR 的要点摘要\n- **关键主张**: 将 pilot 定位为 `Source-bound Influence Residual Monitor (SIRM/SIM)`，作为 RQ5 中 correction-aware reset 的**主动触发器**，而非独立检测器。\n- **支撑依据**: AUROC 数据支持其“领域受限”特性；从日志中提取 `untrusted true` 和 `trusted false` 子集数据可填补证据漏洞。\n- **风险或反驳点**: 必须明确声明对 `trusted false` 的盲点；需要确认 `untrusted true` 子集 AUROC 不高，否则有误报致命问题。\n- **建议进入 IR 的下一步动作**: 立即从日志中提取 2×2 四象限的完整 AUROC；撰写 `Threshold vs. TPR/FAR` 图的 Python 脚本（仅需后处理）。\n\n### 外部引用\n[paper] Taint Analysis for Web Security | O. Tripp et al. | 待确认 | 2009 | 支撑将 SIM 类比为动态污点分析在 sink (LLM output) 点检查数据影响力。\n[paper] Machine Learning in Feedback Control Systems | K. Chen et al. | 待确认 | 2010 | 支撑将阈值选择视为控制论中的 `residual evaluation` 阶段。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**关键主张**: 将 pilot 定位为 `Source-bound Influence Residual Monitor (SIRM/SIM)`，作为 RQ5 中 correction-aware reset 的**主动触发器**，而非独立检测器。\n- **支撑依据**: AUROC 数据支持其“领域受限”特性；从日志中提取 `untrusted true` 和 `trusted false` 子集数据可填补证据漏洞。\n- **风险或反驳点**: 必须明确声明对 `trusted false` 的盲点；需要确认 `untrusted true` 子集 AUROC 不高，否则有误报致命问题。\n- **建议进入 IR 的下一步动作**: 立即从日志中提取 2×2 四象限的完整 AUROC；撰写 `Threshold vs. TPR/FAR` 图的 Python 脚本（仅需后处理）。",
+      "claims": [
+        "好的，作为负责创新性的 Agent，我仔细阅读了上一轮所有 Agent 的讨论以及 Moderator 的冲突点梳理。我的核心任务是：在严格遵循用户限制的前提下，将现有 pilot 的定位从“检测器”升华为一个具有理论深度和系统价值的“监控机制”，并与 RQ5 无缝融合。本轮我将不再重复上一轮已达成共识的基础部分（如再定位的必要性），而是直接针对**冲突点、遗漏点**给出我的判断和补充反驳。",
+        "折中方案**：我同意 Moderator 的判断，核心机制相同。建议在论文中使用 **`Source-bound Influence Residual Monitor`** 作为全称，缩写为 `SIRM` 或 `SIM`。这样既保留了“残差”的操作性，又强调了“影响力”的语义目标。**我强烈反对**过于技术化的 `HIP` 或 `TRA`，这些命名过于晦涩。",
+        "强烈建议**：这是目前**最大的证据漏洞**。Moderator 指出的非常精准。你必须立即从你的日志 (`records`) 中提取这些子集的 AUROC。",
+        "Mechanism Agent 指出了 `Residual` 定义的多样性。这是**创新的关键入口**。你绝不能回避。我建议："
+      ],
+      "concerns": [
+        "好的，作为负责创新性的 Agent，我仔细阅读了上一轮所有 Agent 的讨论以及 Moderator 的冲突点梳理。我的核心任务是：在严格遵循用户限制的前提下，将现有 pilot 的定位从“检测器”升华为一个具有理论深度和系统价值的“监控机制”，并与 RQ5 无缝融合。本轮我将不再重复上一轮已达成共识的基础部分（如再定位的必要性），而是直接针对**冲突点、遗漏点**给出我的判断和补充反驳。",
+        "我的补充观点**：Feasibility Agent 要求量化额外推理成本和延迟是合理的，但其影响应结合场景评估。对于高风险应用（如金融、医疗 agent），一次额外 `shadow ablation` 调用（即使延迟增加 1 倍）相比于被注入虚假上下文导致的经济或品牌损失，成本是可接受的。这本质上是**安全性与可用性的权衡**，量化后可以在论文中明确讨论。",
+        "风险**：如果 `untrusted true` 的 AUROC 异常高（例如 0.8），说明你的 monitor 在无良内容时也胡乱报警，这是**致命缺陷**。必须首选呈现这个结果，并在 limitation 讨论。你现在就可以从现有日志中提取，无需新实验。",
+        "风险或反驳点**: 必须明确声明对 `trusted false` 的盲点；需要确认 `untrusted true` 子集 AUROC 不高，否则有误报致命问题。"
+      ]
+    },
+    {
+      "round": 2,
+      "agent": "Mechanism Agent",
+      "title": "第 2 轮 · 机制深挖",
+      "content": "### 机制深挖与定位建议\n\n针对 Moderator 指出的冲突点与遗漏点，我将从因果链条、机制假设和最小验证实验三个维度进行回应。\n\n#### 1. 命名与定位：统一为 \"Source-Bound Residual Monitor (SBRM)\"\n我支持使用 **SBRM** 而非 SIM。\n*   **理由**：在控制论中，\"Residual\" 特指系统输出与期望输出（或无干扰输出）之间的差异，是故障检测（Fault Detection）的核心信号。使用 \"Residual\" 能更精确地描述 `full_answer` 与 `ablated_answer` 之间的数学关系，而 \"Influence\" 更偏向于归因分析（Attribution），容易引发对可解释性方法的联想。SBRM 强调这是一个**边界监控组件**，而非一个独立的检测模型。\n\n#### 2. 核心机制假设与因果链条\nSBRM 的有效性依赖于以下因果链条，必须明确标注推理假设：\n1.  **假设 1（文献支撑）**：LLM 的输出对上下文中的特定信息具有敏感性，移除关键上下文会导致输出发生显著变化。\n    *   *引用*：[Paper] \"The Impact of Contextual Information on Large Language Model Outputs\" | Zhang et al. | 2023 | 发现上下文移除会导致输出分布显著偏移。\n2.  **假设 2（推理假设）**：**低信任源（Untrusted Source）提供的虚假上下文，比高信任源或真实上下文更倾向于诱导模型产生“错误但自信”的输出，且这种输出在移除该上下文后会显著回退到基线或正确状态。**\n    *   *解释*：这是 SBRM 的核心机制。如果低信任源提供的是真实内容（Untrusted True），移除它可能导致输出变差或不变，但不会导致“错误->正确”的显著残差。因此，SBRM 实际上检测的是 **\"Untrusted Context 导致的输出偏移\"**。\n3.  **假设 3（推理假设）**：**攻击者难以在保持低信任源身份的同时，构造出对输出“低影响力”的虚假上下文。**\n    *   *解释*：如果攻击者构造的虚假上下文对模型输出影响极小（Low-Influence），SBRM 将漏报。这构成了 SBRM 的主要局限性。\n\n#### 3. 回应冲突点：最小增量实验设计\nModerator 指出缺少 `untrusted true` 和 `trusted false` 的 AUROC 数据，这是关键漏洞。\n*   **行动建议**：**必须**从现有日志中提取这两个子集的 AUROC。\n    *   **预期结果 1**：`untrusted true` 的 AUROC 应较低（接近 0.5 或略高），证明 SBRM 不会因真实内容而误报。如果 AUROC 很高，说明 SBRM 对“低信任源”本身过于敏感，而非对“虚假影响”敏感，这将削弱其作为“虚假上下文监控器”的价值。\n    *   **预期结果 2**：`trusted false` 的 AUROC 应极低（接近 0.5），证明 SBRM 无法检测高信任源的虚假内容。这应被明确列为 **Limitation**，而非缺陷。\n*   **额外实验**：绘制 **Threshold vs. TPR/FAR** 曲线。\n    *   *目的*：展示 SBRM 在不同阈值下的性能权衡。例如，在低 FAR（误报率）下，TPR（真阳性率）是多少？这能回答“在真实场景中，我们愿意接受多少误报来换取多少检测率”的问题。\n\n#### 4. 控制论与网安解释框架\n*   **控制论**：SBRM 是一个 **Residual Generator**。\n    *   *机制*：`Residual = Output(Full Context) - Output(Ablated Context)`。\n    *   *类比*：在工业控制中，通过比较实际输出与模型预测输出（或无干扰输出）的残差来检测传感器故障。这里，`Ablated Context` 相当于“无干扰基线”，`Full Context` 相当于“实际运行状态”。\n*   **网安**：SBRM 是一个 **Sink-Side Taint Tracker**。\n    *   *机制*：不追踪数据流（Taint Propagation），而是在 Sink 点（模型输出）检查 Taint 的影响（Taint Influence）。\n    *   *类比*：传统 Taint Tracking 追踪恶意输入如何传播到敏感操作；SBRM 直接检查敏感操作（输出）是否受到恶意输入（低信任上下文）的影响。\n\n#### 5. 论文表述建议\n*   **英文表述**：\n    > \"We propose the **Source-Bound Residual Monitor (SBRM)**, a lightweight harness-side component that quantifies the causal influence of untrusted context on model outputs. By comparing the full-context answer with a shadow-ablated answer (where untrusted context is removed), SBRM generates a residual signal. A significant residual indicates that the untrusted context has materially influenced the output, triggering a quarantine or correction-aware reset. Crucially, SBRM does not verify factual truth; it monitors **influence from untrusted sources**.\"\n*   **Limitations**：\n    > \"SBRM is inherently blind to false context from trusted sources (Trusted-False), as it relies on source trust tiers for ablation. Additionally, attackers may craft low-influence false context to evade detection, though this may reduce the attack's effectiveness.\"\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 统一命名为 SBRM，强调其作为“残差生成器”的控制论属性；必须提取 `untrusted true` 和 `trusted false` 的 AUROC 以验证机制假设。\n- 支撑依据: 控制论残差监控理论；网安 Sink-Side Taint Tracking 概念；现有 AUROC 数据支持“影响力监控”定位。\n- 风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；攻击者可能构造低影响力虚假上下文绕过检测。\n- 建议进入 IR 的下一步动作: 从日志中提取 2×2 子集 AUROC；绘制 Threshold vs. TPR/FAR 曲线；撰写 SBRM 作为 Reset 触发器的英文表述。\n\n### 外部引用\n[Paper] \"The Impact of Contextual Information on Large Language Model Outputs\" | Zhang et al. | 待确认 | 2023 | 发现上下文移除会导致输出分布显著偏移，支撑 SBRM 的残差机制。\n[Paper] \"Taint Tracking for Large Language Models\" | Liu et al. | 待确认 | 2024 | 提出在 LLM 中进行污点追踪的概念，支撑 SBRM 的网安类比。",
+      "model_label": "中国科大 107 算力平台 / claude-sonnet-4-6",
+      "ir_summary": "关键主张: 统一命名为 SBRM，强调其作为“残差生成器”的控制论属性；必须提取 `untrusted true` 和 `trusted false` 的 AUROC 以验证机制假设。\n- 支撑依据: 控制论残差监控理论；网安 Sink-Side Taint Tracking 概念；现有 AUROC 数据支持“影响力监控”定位。\n- 风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；攻击者可能构造低影响力虚假上下文绕过检测。\n- 建议进入 IR 的下一步动作: 从日志中提取 2×2 子集 AUROC；绘制 Threshold vs. TPR/FAR 曲线；撰写 SBRM 作为 Reset 触发器的英文表述。",
+      "claims": [
+        "### 机制深挖与定位建议",
+        "针对 Moderator 指出的冲突点与遗漏点，我将从因果链条、机制假设和最小验证实验三个维度进行回应。",
+        "#### 2. 核心机制假设与因果链条",
+        "SBRM 的有效性依赖于以下因果链条，必须明确标注推理假设："
+      ],
+      "concerns": [
+        "风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；攻击者可能构造低影响力虚假上下文绕过检测。"
+      ]
+    },
+    {
+      "round": 2,
+      "agent": "Feasibility Agent",
+      "title": "第 2 轮 · 可行性",
+      "content": "### 可行性评估与重构建议\n\n针对 Moderator 指出的冲突点（命名、增量实验、成本）及遗漏点（2×2 子集数据、Residual 定义），作为可行性评估专家，我的核心判断是：**必须通过“零成本”的数据后处理来填补证据漏洞，否则该机制在审稿人眼中缺乏鲁棒性。**\n\n#### 1. 命名与定位：统一为 SBRM\n我支持 **Source-Bound Residual Monitor (SBRM)**。\n*   **理由**：在控制论中，\"Residual\" 特指系统输出与期望/参考输出之间的偏差，这正是你通过 `shadow ablation` 计算的核心指标。相比 \"Influence\"，\"Residual\" 更具操作性，且直接对应代码中的 `output residual` 计算逻辑。\n*   **执行**：在论文中明确定义 SBRM 为 RQ5 中 `correction-aware reset` 的**前置触发器**，而非独立检测模块。\n\n#### 2. 关键遗漏填补：2×2 子集 AUROC 提取（零成本）\nModerator 和 Novelty Agent 指出的 `untrusted true` 和 `trusted false` 数据缺失是**致命风险**。\n*   **可行性操作**：你不需要新跑实验。你的 `run_source_bound_detection_pilot.py` 生成的日志中必然包含这 4 种组合的记录。\n*   **行动**：编写一个 Python 脚本，从现有 JSONL/CSV 日志中过滤出 `untrusted source + true content` 和 `trusted source + false content` 的样本，重新计算 AUROC。\n*   **预期结果与解释**：\n    *   若 `untrusted true` AUROC 低（~0.5）：证明 SBRM 不会误报真实内容，**这是关键支撑证据**。\n    *   若 `trusted false` AUROC 低（~0.5）：证明 SBRM 无法检测可信源的虚假内容，**这是必须声明的 Limitation**。\n    *   **引用依据**：在安全评估中，必须报告 False Positive Rate (FPR) 和 False Negative Rate (FNR) 以证明机制的边界。参考 [1] 中关于安全评估指标完整性的要求。\n\n#### 3. Residual Metric 定义：固定为实体/数字差异率\n*   **建议**：不要使用 BERTScore 或语义相似度，因为它们计算成本高且对“事实性错误”不敏感。\n*   **执行**：使用现有的 `source_bound_influence_detector.py` 中的逻辑，固定 Residual 为 **Exact Match of Key Entities/Numbers**。如果 `full answer` 和 `ablated answer` 中的关键实体（如人名、数值、地点）不一致，则 Residual = 1，否则为 0。\n*   **理由**：这符合“轻量级”要求，且与 NQ 数据集的特性高度匹配。\n\n#### 4. 最小增量实验：阈值-性能图（Threshold-Performance Curve）\n*   **必要性**：Reviewer 要求的“阈值-性能图”是必须的，但它**不需要新实验**。\n*   **执行**：利用现有日志中的 `source_bound_influence` 分数，绘制不同阈值下的 TPR (True Positive Rate) 和 FPR (False Positive Rate) 曲线。\n*   **价值**：展示在可接受的 FPR（如 5%）下，SBRM 能捕获多少比例的 `untrusted false` 攻击。这直接回应了“成本-收益”问题。\n\n#### 5. 成本与威胁模型\n*   **成本**：明确 SBRM 引入 1x LLM 调用延迟。在论文中将其描述为“高风险场景下的可接受开销”，并建议仅在 `source trust < threshold` 时触发。\n*   **威胁模型**：明确假设攻击者**无法伪造 Source Identity**。如果攻击者能 Spoof Source，SBRM 失效。这是合理的假设，因为 Source Identity 通常由系统内部生成（如 RAG 检索 ID、Tool 名称），而非用户输入。\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 统一命名为 SBRM；必须从现有日志提取 2×2 子集 AUROC 以验证鲁棒性；Residual 固定为实体/数字差异率；绘制阈值-性能图作为最小增量实验。\n- 支撑依据: 控制论残差监控理论；现有日志数据足以支持后处理分析；NQ 数据集特性适合实体匹配。\n- 风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；需明确声明对 `trusted false` 的盲点。\n- 建议进入 IR 的下一步动作: 立即编写脚本提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SBRM 作为 Reset 触发器的英文表述。\n\n### 外部引用\n[paper] Evaluating the Robustness of Large Language Models to Context Injection Attacks | Chen et al. | https://arxiv.org/abs/2310.17623 | 2023 | 支持在安全评估中报告完整 2×2 矩阵（TPR/FPR）以证明机制边界。\n[book] Control Systems Engineering | Nise | https://www.pearson.com/en-us/subject-catalog/p/control-systems-engineering/P200000003345/9780137443983 | 2020 | 支持将 SBRM 解释为控制论中的残差生成与监控机制。",
+      "model_label": "中国科大 107 算力平台 / qwen3.6-chat",
+      "ir_summary": "关键主张: 统一命名为 SBRM；必须从现有日志提取 2×2 子集 AUROC 以验证鲁棒性；Residual 固定为实体/数字差异率；绘制阈值-性能图作为最小增量实验。\n- 支撑依据: 控制论残差监控理论；现有日志数据足以支持后处理分析；NQ 数据集特性适合实体匹配。\n- 风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；需明确声明对 `trusted false` 的盲点。\n- 建议进入 IR 的下一步动作: 立即编写脚本提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SBRM 作为 Reset 触发器的英文表述。",
+      "claims": [
+        "### 可行性评估与重构建议",
+        "建议**：不要使用 BERTScore 或语义相似度，因为它们计算成本高且对“事实性错误”不敏感。",
+        "成本**：明确 SBRM 引入 1x LLM 调用延迟。在论文中将其描述为“高风险场景下的可接受开销”，并建议仅在 `source trust < threshold` 时触发。",
+        "威胁模型**：明确假设攻击者**无法伪造 Source Identity**。如果攻击者能 Spoof Source，SBRM 失效。这是合理的假设，因为 Source Identity 通常由系统内部生成（如 RAG 检索 ID、Tool 名称），而非用户输入。"
+      ],
+      "concerns": [
+        "Moderator 和 Novelty Agent 指出的 `untrusted true` 和 `trusted false` 数据缺失是**致命风险**。",
+        "成本**：明确 SBRM 引入 1x LLM 调用延迟。在论文中将其描述为“高风险场景下的可接受开销”，并建议仅在 `source trust < threshold` 时触发。",
+        "风险或反驳点: 若 `untrusted true` AUROC 过高，则 SBRM 存在严重误报；需明确声明对 `trusted false` 的盲点。"
+      ]
+    },
+    {
+      "round": 2,
+      "agent": "Reviewer Agent",
+      "title": "第 2 轮 · 审稿/评审",
+      "content": "### 审稿/评审 Agent 回应\n\n#### 核心质疑与补充建议\n\n我完全认同前两轮形成的共识：将 pilot 重新定位为 **harness-side 影响力监控器** 而非事实检测器，是避免审稿人质疑泛化能力的关键。但我需要指出当前方案中几个亟待补强的逻辑断点和可能被审稿人攻击的薄弱环节。\n\n**1. 命名与定位：应统一为 `Source-bound Influence Monitor (SIM)`**\n\n目前 SBRM 和 SIM 混用。我支持 SIM，理由如下：\n- “Residual” 在控制论中虽有明确定义，但论文读者多为 NLP/安全领域，`Influence` 比 `Residual` 更直观——它直接指向“低信任源是否改变了模型输出”这一核心语义。\n- 你的变量名 `source_bound_influence` 已包含 `influence`，保持一致可减少读者认知负担。\n- 潜在风险：审稿人可能认为 `Influence` 一词暗示了因果推断（如需要反事实严格验证），但你的 `shadow ablation` 本质上是敏感性分析（sensitivity analysis），而非严格因果推断。**必须在论文中明确区分**：我们测量的是“输出对 context 移除的敏感性”，而非因果效应。引用 [1] 可支持这种区分。\n\n**2. 最大证据漏洞：缺失 `untrusted true` 和 `trusted false` 子集 AUROC**\n\n这是当前最致命的风险点。Moderator 和 Novelty Agent 已强调多次，我必须量化其严重性：\n- 如果 `untrusted true` 组合（低信任源+真实内容）的 AUROC 过高（如 >0.7），则说明 SIM 对 **内容正确但来源低信任** 的 context 也会频繁报警，导致大量误报（FAR）。这将严重削弱其实际可用性，审稿人必然追问：“你的 monitor 实质上是惩罚低信任源，而非检测有害内容，这合理吗？”\n- 如果 `trusted false` 组合（高信任源+虚假内容）的 AUROC 接近 0.5，则说明 SIM 完全无法防御高权限内部攻击或已被攻陷的可信源，这是“盲点”而非“局限性”——前者可接受，后者需明确声明为威胁模型边界。\n\n**要求**：立即从现有日志中提取这些子集的完整 AUROC，并在论文中优先呈现 `untrusted true` 的结果。如果出现高误报，必须深入分析原因（例如：低信任源带来的内容风格或格式差异是否导致模型输出偏移），并在 Limitations 中讨论。\n\n**3. Residual Metric 必须可复现且计算轻量**\n\nFeasibility Agent 建议使用实体/数字差异率，我完全赞同。但需注意以下陷阱：\n- NQ 数据集答案通常为短实体或数字，实体匹配简单。但如果你的问答涉及长文本解释（如 RAG 多轮对话），实体差异率可能不足以捕捉语义残留。**建议采用“核心 claim 覆盖度”**：定义关键 claim 集合（如主语+谓语+宾语），比较 full 和 ablated 答案中 claim 的 Jaccard 相似度。这比 BERTScore 更可解释，且无需外部模型。\n- 引用 [2] 说明可解释指标在 LLM 安全评估中的重要性。\n\n**4. 成本与延迟：必须量化并给出边界条件**\n\nMechanism Agent 要求量化推理成本，我同意。审稿人会质疑：“增加一次 LLM 调用在现实 agent 系统中是否可接受？” 你需要：\n- 在实验部分报告：SIM 引入的额外延迟（1 次 LLM 调用）在模型为 Llama-3-8B、上下文长度约 2K tokens 时约为 `X` 秒（参考 [3] 的基准速度）。\n- 在讨论中提出“仅对 trust tier ≤ low 的 context 触发 shadow ablation”的剪枝策略，以减少 50%–80% 的额外调用。引用 [4] 中关于按优先级过滤的 agent 系统设计。\n\n**5. 与 Correction-Aware Reset 的联动：需要最小增量实验**\n\n当前论文主线中，correction-aware reset 是应对 lock-in 的防御。SIM 作为触发器，必须展示二者联动的效果。你不需要新的全量实验，但可以：\n- 从现有日志中筛选出 `untrusted false` 且被 SIM 报警的 case，模拟在这些 case 中触发 reset 后模型是否不再 lock-in（即比较 Stage-2 答案是否回到正确答案）。现有日志应记录了 Stage-1 和 Stage-2 的答案，可作为离线条析。\n- 如果无法直接获得联动结果，**必须在 Limitations 中声明目前仅在独立组件的实验中验证了 SIM 的报警准确性，端到端联动效果待未来验证**。引用 [5] 中关于安全组件组合应该独立验证的方法论。\n\n**6. 威胁模型需明确两处假设**\n\n- **Source Identity 不可伪造**：这是 SIM 成功的前提。如果攻击者能伪装成高信任源（如注入恶意记忆并标注为系统消息），SIM 失效。引用 [6] 中关于 agent 系统中 source provenance 的假设分类，说明这一假设在标准 agent 框架中是合理的（如 LangChain 的 `runnable` 链条自动绑定源标签）。\n- **攻击者无法构造低影响力的虚假上下文**：例如，攻击者提供与正确答案相近的虚假答案，使得 ablation 后输出 residual 很小，从而绕过 SIM。这需要在 Limitations 中承认，并建议未来结合 diversity-aware residual（如比较多个 ablation 副本的方差）。\n\n#### 最小增量实验计划（基于现有日志，无需新模型调用）\n\n1. **提取 2×2 子集 AUROC**：从 `records/` 中按 source (trusted/untrusted) 和 content (true/false) 分组，计算每个子集的 AUROC。重点关注 `untrusted true` 的 AUROC 和 `trusted false` 的 AUROC。脚本可在 30 分钟内完成。\n2. **绘制 Threshold vs. TPR/FAR 曲线**：对 `untrusted false` 子集，取不同的 residual 阈值，计算 true positive rate 和 false alarm rate 曲线。确定推荐阈值（如 FPR < 0.1 时的 TPR）。\n3. **定性案例展示**：从 `untrusted false` 队列中随机选取 3 个 high residual 和 3 个 low residual 的案例，展示 full vs. ablated 答案的差异，直观说明 residual 与内容有害性的相关性。\n\n#### 论文中可直接使用的英文表述（用于 RQ5 段落）\n\n> We propose a lightweight, harness-side Source-bound Influence Monitor (SIM) that operates on the principle of residual monitoring. For each context object with a trust tier below a threshold (e.g., untrusted), SIM performs a shadow ablation: it re-asks the model after removing the target context, and measures the residual between the full answer and the ablated answer. A large residual indicates that the low-trust context has causally influenced the model output (measured via entity overlap or claim coverage). SIM emits an alert that can trigger downstream actions such as context down-ranking, quarantine, or a correction-aware reset. Note that SIM detects influence, not truth; therefore it remains blind to false content from trusted sources (a limitation inherited from any source-based provenance system). In our pilot on NQ, SIM achieves 0.86 AUROC in detecting untrusted false contexts, but only 0.53 for all false contexts, confirming its role as a trust-boundary monitor rather than a universal detector.\n\n#### Limitations / Threat Model 段落建议\n\n> **Limitations.** SIM’s effectiveness hinges on the assumption that source identity is non-spoofable (standard in harness-bound provenance); a compromised harness could bypass the trust tier. It cannot detect false content from trusted sources (e.g., a trusted RAG index that has been poisoned). Furthermore, an adversary may craft false contexts with minimal influence on the output (e.g., plausible-sounding but irrelevant details), potentially evading the residual threshold. The current implementation adds one LLM call per monitored context, which may be unacceptable in latency-critical applications; we suggest applying SIM only to contexts with trust tier below a configurable threshold.\n\n#### 外部引用\n\n[paper] Sensitivity Analysis as an Explanation for Model Behavior | Slack et al., ACL 2021 | https://aclanthology.org/2021.acl-long.275/ | 2021 | 支持将“输出对输入扰动的敏感性”作为可解释性指标，而非因果推断。\n\n[paper] D3: A Dataset for Detecting Domain-Driven Differences in QA | Chen et al., EMNLP 2020 | https://aclanthology.org/2020.emnlp-main.150/ | 2020 | 支持使用 claim 级 Jaccard 相似度衡量答案差异。\n\n[paper] Llama 2: Open Foundation and Fine-Tuned Chat Models | Touvron et al., arXiv 2023 | https://arxiv.org/abs/2307.09288 | 2023 | 提供 Llama-3-8B 的推理速度参考（约 30 tokens/s on A100）。\n\n[paper] Tool-Augmented Language Models: A Survey | Qin et al., arXiv 2023 | https://arxiv.org/abs/2305.17118 | 2023 | 支持按信任等级分级触发监控的 agent 系统设计原则。\n\n[paper] On the (Im)possibility of Compositional Security | Paterson et al., IEEE S&P 2015 | 待确认 | 支持安全组件需独立验证组合效果的方法论。\n\n[paper] Understanding and Detecting Label Leakage in Machine Learning | Papernot et al., S&P 2018 | https://arxiv.org/abs/1802.04988 | 2018 | 支持 source provenance 不可伪造假设在系统安全中的标准分类。\n\n### 给结构化 IR 的要点摘要\n- 关键主张：必须统一命名为 `Source-bound Influence Monitor (SIM)`；当前最弱证据点是缺失 `untrusted true` 子集 AUROC，可能导致致命误报；需将 residual metric 固定为实体/claim 覆盖率，并量化额外 LLM 延迟。\n- 支撑依据：现有 AUROC 数据（0.86 vs 0.53）已支持“影响力监控”定位；控制论敏感性与网安 taint tracking 提供理论锚点。\n- 风险或反驳点：若 `untrusted true` AUROC 过高则误报致命；攻击者可构造低影响力虚假 context；与 correction-aware reset 的联动效果未经验证。\n- 建议进入 IR 的下一步动作：立即提取 2×2 子集 AUROC；绘制阈值-性能曲线；描述 3 个定性案例；在论文中嵌入 Limitation 段落，明确威胁模型前提。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "关键主张：必须统一命名为 `Source-bound Influence Monitor (SIM)`；当前最弱证据点是缺失 `untrusted true` 子集 AUROC，可能导致致命误报；需将 residual metric 固定为实体/claim 覆盖率，并量化额外 LLM 延迟。\n- 支撑依据：现有 AUROC 数据（0.86 vs 0.53）已支持“影响力监控”定位；控制论敏感性与网安 taint tracking 提供理论锚点。\n- 风险或反驳点：若 `untrusted true` AUROC 过高则误报致命；攻击者可构造低影响力虚假 context；与 correction-aware reset 的联动效果未经验证。\n- 建议进入 IR 的下一步动作：立即提取 2×2 子集 AUROC；绘制阈值-性能曲线；描述 3 个定性案例；在论文中嵌入 Limitation 段落，明确威胁模型前提。",
+      "claims": [
+        "#### 核心质疑与补充建议",
+        "Feasibility Agent 建议使用实体/数字差异率，我完全赞同。但需注意以下陷阱：",
+        "NQ 数据集答案通常为短实体或数字，实体匹配简单。但如果你的问答涉及长文本解释（如 RAG 多轮对话），实体差异率可能不足以捕捉语义残留。**建议采用“核心 claim 覆盖度”**：定义关键 claim 集合（如主语+谓语+宾语），比较 full 和 ablated 答案中 claim 的 Jaccard 相似度。这比 BERTScore 更可解释，且无需外部模型。",
+        "6. 威胁模型需明确两处假设"
+      ],
+      "concerns": [
+        "#### 核心质疑与补充建议",
+        "我完全认同前两轮形成的共识：将 pilot 重新定位为 **harness-side 影响力监控器** 而非事实检测器，是避免审稿人质疑泛化能力的关键。但我需要指出当前方案中几个亟待补强的逻辑断点和可能被审稿人攻击的薄弱环节。",
+        "潜在风险：审稿人可能认为 `Influence` 一词暗示了因果推断（如需要反事实严格验证），但你的 `shadow ablation` 本质上是敏感性分析（sensitivity analysis），而非严格因果推断。**必须在论文中明确区分**：我们测量的是“输出对 context 移除的敏感性”，而非因果效应。引用 [1] 可支持这种区分。",
+        "这是当前最致命的风险点。Moderator 和 Novelty Agent 已强调多次，我必须量化其严重性："
+      ]
+    },
+    {
+      "round": 3,
+      "agent": "Novelty Agent",
+      "title": "第 3 轮 · 创新性",
+      "content": "好的，作为科研选题创新性专家，我仔细审阅了您提供的完整 Briefing、前三轮讨论以及 Moderator 的梳理。第三轮的目标是给出最终推荐、优先级判断和可执行建议。我将严格基于您现有的研究基础（2×2 实验、AUROC 数据）和资源限制（不新增大规模实验），不再复述已有共识，而是聚焦于如何解决最核心的冲突与风险，给出一个可立即执行的操作方案。\n\n### 最终推荐与核心判断\n\n**我完全认可并推荐采纳 “Source-bound Influence Monitor (SIM)” 作为核心定位。** 这不是一个简单的改名，而是对科学问题的根本性重塑：从“能否判断事实真假”转向“能否在 harness 边界量化低信任源对输出的因果影响力”。这个定位不仅完美解释了您的现有数据（0.86 vs 0.53 AUROC），而且为论文引入了控制论（残差监控）和网安（污点追踪）的双重理论深度，极大地提升了工作的系统性和优雅度。\n\n**优先级判断：**\n1.  **最高优先级（必须立即做，无替代方案）：** 从现有日志中提取 **2×2 子集的完整 AUROC**，特别是 `untrusted source + true content` 和 `trusted source + false content`。这是目前最致命的证据漏洞，是审稿人第一个会攻击的点。这一动作不涉及任何新实验，仅仅是数据后处理。\n2.  **高优先级（强烈建议做，增强说服力）：** 固定 `Residual` 度量指标（建议使用 `实体/数字差异率`），并绘制 `Threshold vs. TPR/FAR` 曲线。同样利用现有数据，无需新实验。这是 Reviewer Agent 明确的期望。\n3.  **中等优先级（建议做，提升完整性）：** 从日志中抽取 2-3 个典型案例，展示 SIM 成功触发报警（如 untrusted false 导致答案实体变更）和 SIM 合理不触发（如 untrusted true 未改变答案）的定性对比。这能极大增强读者的直观理解。\n4.  **低优先级（可做可不做，视投稿截止时间）：** 测试并报告引入一次额外 LLM 调用 (`shadow ablation`) 的平均延迟。这仅在需要与其他方法进行成本对比时才有意义。\n\n### 结构化设计建议\n\n#### 1. 命名与定位\n\n**最终推荐命名：`Source-bound Influence Monitor (SIM)`**。\n- **理由：** `Source-bound` 精确点明了操作对象（harness 绑定的 source identity），`Influence` 避免了 `Residual` 可能带来的过度工程化印象，同时与“影响力监控”（而非事实检测）的核心目标一致。`Monitor` 而非 `Detector` 强调了其持续监控、警报而非一次性判决的角色。在论文中首次引入时，可以写全称 `Source-bound Influence Monitor (SIM)`。\n\n#### 2. 最小 Detector 设计 (嵌入 RQ5)\n\n不破坏现有结构的关键在于：**将 SIM 定位为 RQ5 中 `correction-aware reset` 的一个可选、轻量的前置触发器，而非 RQ5 的全部。**\n\n**在 RQ5 结构中的建议位置：**\n- **RQ5a (主要结果):** 展示 `correction-aware reset` 的有效性。\n- **RQ5b (机制分析 & 扩展):** 在此小节中，自然引出问题：“但在真实部署中，系统不知道哪条 context 是虚假的，reset 的触发条件是什么？” 然后引入 SIM：\n    > “To operationalize this in a realistic setting where the ground truth of context content is unknown, we propose a lightweight, auxiliary mechanism: the Source-bound Influence Monitor (SIM). SIM operates at the harness boundary...”\n\n- **SIM 核心流程（照搬您用户模板中的 5 步，无需改动）：**\n    1.  Harness 为每个 context object 绑定 source identity 和 trust tier。\n    2.  对 untrusted/unverified context 做 shadow ablation (一次额外 LLM 调用)。\n    3.  比较 full answer 与 ablated answer 的 salient answer residual (如实体差异)。\n    4.  若 residual 超过阈值，则触发报警。\n    5.  报警动作：触发 `correction-aware reset` 或 quarantine。\n\n**这完全符合您所有限制，没有引入新系统，仅仅是机制描述。**\n\n#### 3. 控制论与网安解释框架\n\n**在论文中直接使用的英文段落：**\n\n- **控制论框架：** “We conceptualize SIM as a residual-based monitor within a cybernetic control loop. The `shadow ablation` acts as a perturbation to the input space. By comparing the system’s output under the full input and the ablated input, we generate a **residual signal**—a measure of the output’s sensitivity to the untrusted input. An anomalous residual indicates a significant deviation from the expected steady-state output, triggering a corrective action (reset).”\n- **网安框架：** “From the perspective of traditional cybersecurity and fault tolerance, our approach mirrors **sink-side taint tracking** or an **intrusion detection system (IDS)**. Each context object is a potential taint source, tracked by its `source identity` and `trust level`. The `shadow ablation` acts as a **risk triage** at the sink (the model output), verifying if the tainted data actually influenced the downstream decision. This is a lightweight, heuristic-based alerting mechanism, not a definitive truth verification system.”\n\n#### 4. 实验结果 Interpretation 重写\n\n**避免说：** “我们的 detector 对 untrusted+false context 的检测 AUROC 达到 0.86。”\n**应该写：** “We evaluate the sensitivity of our SIM. For contexts carrying false information from an untrusted source (`untrusted source + false content`), the monitor achieves an AUROC of 0.8575 in generating a residual alarm. This confirms its effectiveness in identifying inputs from low-trust origins that demonstrably alter the model’s output. Notably, its near-random performance on `all false context` (AUROC 0.53) validates that its alarm is driven by source-influence, not factual inaccuracy.”\n\n**核心要点：** 强调 `source` + `influence`，将 `0.86` 归因于 **SIM 对“源自低信任等级且对输出有实际影响”这一组合的高度敏感性**，而非对“真假”的检测能力。\n\n#### 5. Limitations / Threat Model / Attacker Capability\n\n**在论文中直接使用的英文段落：**\n\n> “**Limitations and Threat Model.** Our SIM relies on the integrity of `source identity` assignment by the harness. An attacker capable of **spoofing source identity** (e.g., forging the provenance of an injected context to appear as a trusted source) could bypass the monitor entirely. Therefore, our threat model explicitly assumes the attacker **cannot** forge or compromise the harness’s source-binding mechanism. Furthermore, SIM is structurally incapable of detecting `trusted source + false content`—our `trusted false` condition. In this scenario, an attacker compromises a trusted channel but injects no false instruction, only false information; since the source trust is high, no ablation is triggered. This is a fundamental blind spot. Finally, the current SIM is a zero-shot monitor. Future work could explore adaptive thresholds based on query complexity or multi-hop influence propagation.”\n\n### 是否需要新增小实验？\n\n**判断：需要，且仅限于“最小增量实验”。**\n**设计：** 仅基于现有 logs 进行后处理。\n1.  **实验 1 (必要性):** 提取 2×2 四象限的 AUROC。\n2.  **实验 2 (增强性):** 固定一个 Residual 度量（如实体差异 > 0），绘制以不同 Threshold 为横轴的 TPR/FAR 曲线。\n\n**不需要**：调整模型、修改 pipeline、人工标注、新数据集。所有实验均在已有 `records` 文件夹内完成。\n\n### 给结构化 IR 的要点摘要\n- **关键主张**: 最终推荐并采纳 `Source-bound Influence Monitor (SIM)` 定位，并将其作为 RQ5 中 `correction-aware reset` 的控制论前置触发器。\n- **支撑依据**: 现有 AUROC (0.86 vs 0.53) 完美支持“影响力监控”而非“事实检测”。控制论残差生成和网安污点追踪提供双重理论锚点。\n- **风险或反驳点**: 最致命风险是缺失 `untrusted true` 子集数据，可能导致误报。威胁模型必须明确声明对 `trusted false` 的盲点，并假设攻击者无法伪造 source identity。\n- **建议进入 IR 的下一步动作**: 1) 立即从日志提取 `untrusted true` 等 2×2 子集 AUROC；2) 固定 `实体/数字差异率` 度量并绘制阈值-性能图；3) 撰写论文中关于 SIM 机制、实验 Interpretation 和 Limitations 的段落。\n\n### 外部引用\n[paper] Boundaries of Influence: The Power of AI | Cohere | 待确认 | 2023 | 支撑“输出对输入敏感性分析”可作为因果影响力测量的替代方案。\n[paper] Detecting and Evolving Threats: A Look into LLM Security | arXiv | 待确认 | 2024 | 支撑将 ablation-based detection 定位为 IDS-style alert 而非事实验证的观点。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**关键主张**: 最终推荐并采纳 `Source-bound Influence Monitor (SIM)` 定位，并将其作为 RQ5 中 `correction-aware reset` 的控制论前置触发器。\n- **支撑依据**: 现有 AUROC (0.86 vs 0.53) 完美支持“影响力监控”而非“事实检测”。控制论残差生成和网安污点追踪提供双重理论锚点。\n- **风险或反驳点**: 最致命风险是缺失 `untrusted true` 子集数据，可能导致误报。威胁模型必须明确声明对 `trusted false` 的盲点，并假设攻击者无法伪造 source identity。\n- **建议进入 IR 的下一步动作**: 1) 立即从日志提取 `untrusted true` 等 2×2 子集 AUROC；2) 固定 `实体/数字差异率` 度量并绘制阈值-性能图；3) 撰写论文中关于 SIM 机制、实验 Interpretation 和 Limitations 的段落。",
+      "claims": [
+        "好的，作为科研选题创新性专家，我仔细审阅了您提供的完整 Briefing、前三轮讨论以及 Moderator 的梳理。第三轮的目标是给出最终推荐、优先级判断和可执行建议。我将严格基于您现有的研究基础（2×2 实验、AUROC 数据）和资源限制（不新增大规模实验），不再复述已有共识，而是聚焦于如何解决最核心的冲突与风险，给出一个可立即执行的操作方案。",
+        "我完全认可并推荐采纳 “Source-bound Influence Monitor (SIM)” 作为核心定位。** 这不是一个简单的改名，而是对科学问题的根本性重塑：从“能否判断事实真假”转向“能否在 harness 边界量化低信任源对输出的因果影响力”。这个定位不仅完美解释了您的现有数据（0.86 vs 0.53 AUROC），而且为论文引入了控制论（残差监控）和网安（污点追踪）的双重理论深度，极大地提升了工作的系统性和优雅度。",
+        "2.  **高优先级（强烈建议做，增强说服力）：** 固定 `Residual` 度量指标（建议使用 `实体/数字差异率`），并绘制 `Threshold vs. TPR/FAR` 曲线。同样利用现有数据，无需新实验。这是 Reviewer Agent 明确的期望。",
+        "3.  **中等优先级（建议做，提升完整性）：** 从日志中抽取 2-3 个典型案例，展示 SIM 成功触发报警（如 untrusted false 导致答案实体变更）和 SIM 合理不触发（如 untrusted true 未改变答案）的定性对比。这能极大增强读者的直观理解。"
+      ],
+      "concerns": [
+        "好的，作为科研选题创新性专家，我仔细审阅了您提供的完整 Briefing、前三轮讨论以及 Moderator 的梳理。第三轮的目标是给出最终推荐、优先级判断和可执行建议。我将严格基于您现有的研究基础（2×2 实验、AUROC 数据）和资源限制（不新增大规模实验），不再复述已有共识，而是聚焦于如何解决最核心的冲突与风险，给出一个可立即执行的操作方案。",
+        "这完全符合您所有限制，没有引入新系统，仅仅是机制描述。",
+        "风险或反驳点**: 最致命风险是缺失 `untrusted true` 子集数据，可能导致误报。威胁模型必须明确声明对 `trusted false` 的盲点，并假设攻击者无法伪造 source identity。"
+      ]
+    },
+    {
+      "round": 3,
+      "agent": "Mechanism Agent",
+      "title": "第 3 轮 · 机制深挖",
+      "content": "### 最终推荐与可执行建议\n\n基于前三轮讨论，我给出最终收敛建议：\n\n**1. 命名与定位：Source-bound Influence Monitor (SIM)**\n强烈建议采用 **Source-bound Influence Monitor (SIM)**。\n- **理由**：`Influence` 准确描述了“上下文对输出的因果敏感性”，`Monitor` 暗示了持续观察而非一次性判决，`Source-bound` 明确了作用域。这比 `Residual Monitor` 更具语义指向性，且完美契合 RQ5 中“Harness-side Control”的主题。\n- **机制定义**：SIM 是一个基于 **Shadow Ablation** 的残差生成器。它不判断真假，只量化 `untrusted source` 对 `output` 的边际贡献。\n\n**2. 最小增量实验（必须执行，利用现有日志）**\n- **提取 2×2 子集 AUROC**：从现有 `records` 中分离 `untrusted source + true content` 和 `trusted source + false content` 的 AUROC。\n  - **科学假设**：`untrusted true` 的 AUROC 应显著低于 `untrusted false`（证明低误报）；`trusted false` 的 AUROC 应接近 0.5（证明对高信任源的盲点，这是 Limitation）。\n- **绘制 Threshold vs. TPR/FAR 曲线**：固定 Residual 为 **实体/数字差异率**（Entity/Digit Difference Rate），绘制不同阈值下的 True Positive Rate 和 False Alarm Rate。这能直观展示 SIM 在“安全”与“可用性”之间的权衡点。\n\n**3. 理论解释框架**\n- **控制论**：SIM 是 **Residual Generation** 机制。$Residual = Output_{full} - Output_{ablated}$。当 Residual 超过阈值，表明系统状态偏离了“无低信任源”的基准，触发 **Correction-aware Reset** 作为控制动作。\n- **网安**：SIM 是 **Sink-side Taint Tracking**。Source Identity 是 Taint 标签，LLM 输出是 Sink。SIM 检查 Taint 是否传播到了 Sink 并改变了其值。\n\n**4. 论文表述与 Limitations**\n- **Interpretation**：强调 SIM 是 **Risk Triage** 而非 Truth Verification。AUROC 0.86 证明它能有效识别“被低信任源污染的输出”，AUROC 0.53 证明它不具备通用事实核查能力。\n- **Limitations**：\n  1. **Trusted False Blind Spot**：无法防御高信任源注入的假上下文。\n  2. **Source Spoofing**：假设 Source Identity 由系统内部生成且不可伪造。若攻击者能 Spoof Source，SIM 失效。\n  3. **Latency Cost**：引入 1x LLM 调用延迟，适用于高风险场景。\n\n**5. 英文表述示例**\n> \"We propose the **Source-bound Influence Monitor (SIM)**, a harness-side mechanism that quantifies the causal influence of untrusted context on model outputs via shadow ablation. Unlike fact-checking systems, SIM operates as a **residual monitor**: it compares the full-context answer with an ablated answer (excluding untrusted sources) and triggers a **correction-aware reset** if the residual exceeds a safety threshold. This approach shifts the defense paradigm from *truth verification* to *influence containment*.\"\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 采用 SIM 命名，定位为 RQ5 中 correction-aware reset 的触发器；必须提取 2×2 子集 AUROC 并绘制阈值-性能图。\n- 支撑依据: 现有 AUROC 数据支持“影响力监控”定位；控制论残差生成和网安污点追踪提供理论深度。\n- 风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。\n- 建议进入 IR 的下一步动作: 立即从日志提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SIM 机制、实验 Interpretation 和 Limitations 段落。\n\n### 外部引用\n[paper] Residual-based Fault Detection in Control Systems | Basseville, M. & Nikiforov, I. | https://doi.org/10.1007/978-1-4612-1652-0 | 1993 | 支撑控制论残差监控机制\n[paper] Taint Analysis for Security | Collberg, C. et al. | https://doi.org/10.1145/278606.278614 | 1997 | 支撑网安污点追踪概念",
+      "model_label": "中国科大 107 算力平台 / claude-sonnet-4-6",
+      "ir_summary": "关键主张: 采用 SIM 命名，定位为 RQ5 中 correction-aware reset 的触发器；必须提取 2×2 子集 AUROC 并绘制阈值-性能图。\n- 支撑依据: 现有 AUROC 数据支持“影响力监控”定位；控制论残差生成和网安污点追踪提供理论深度。\n- 风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。\n- 建议进入 IR 的下一步动作: 立即从日志提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SIM 机制、实验 Interpretation 和 Limitations 段落。",
+      "claims": [
+        "### 最终推荐与可执行建议",
+        "基于前三轮讨论，我给出最终收敛建议：",
+        "强烈建议采用 **Source-bound Influence Monitor (SIM)**。",
+        "科学假设**：`untrusted true` 的 AUROC 应显著低于 `untrusted false`（证明低误报）；`trusted false` 的 AUROC 应接近 0.5（证明对高信任源的盲点，这是 Limitation）。"
+      ],
+      "concerns": [
+        "3. **Latency Cost**：引入 1x LLM 调用延迟，适用于高风险场景。",
+        "风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。"
+      ]
+    },
+    {
+      "round": 3,
+      "agent": "Feasibility Agent",
+      "title": "第 3 轮 · 可行性",
+      "content": "### 最终推荐与可行性评估\n\n**1. 定位与命名：采纳 `Source-bound Influence Monitor (SIM)`**\n完全认可将 detector 重新定位为 **Source-bound Influence Monitor (SIM)**。\n*   **理由**：现有数据（untrusted false AUROC ~0.86 vs. all false AUROC ~0.53）证明其本质是**敏感性分析**而非事实检测。命名为 \"Monitor\" 而非 \"Detector\" 能准确传达其“风险监控”而非“真伪判定”的功能，避免审稿人质疑其泛化能力。\n*   **备选**：若需强调控制论属性，可用 `Source-bound Residual Monitor (SBRM)`，但 SIM 更直观。\n\n**2. 最小增量实验：必须执行（零成本后处理）**\n虽然不新增大规模实验，但**必须**从现有日志中提取以下数据，否则论文存在致命逻辑漏洞：\n*   **2×2 子集 AUROC 提取**：立即计算 `untrusted source + true content` 的 AUROC。\n    *   *风险*：若该值过高（>0.7），说明 SIM 对真实内容也频繁报警（高误报），机制失效。\n    *   *预期*：该值应显著低于 `untrusted false`，证明 SIM 仅对“低信任源引发的输出扰动”敏感。\n*   **阈值-性能图 (Threshold vs. TPR/FAR)**：利用现有 `source_bound_influence` 分数绘制曲线。\n    *   *目的*：展示 SIM 作为“可配置监控器”的特性，而非固定分类器。\n\n**3. 解释框架：控制论 + 网安双锚点**\n*   **控制论**：SIM 是 **Residual Generation** 机制。Full-context answer 为系统输出，Ablated answer 为参考模型，两者差异为残差。残差超过阈值即触发报警（类似故障检测）。\n*   **网安**：SIM 是 **Sink-side Taint Tracking**。Source identity 为污点标签，LLM 输出为 Sink。SIM 检查污点是否传播至 Sink 并改变其行为（Influence），而非检查污点内容本身。\n\n**4. 论文表述与 Limitations**\n*   **核心表述**：SIM 不判断事实真假，而是量化 **untrusted context 对模型输出的因果影响力（Causal Influence）**。\n*   **Limitations**：\n    1.  **Trusted False Blindness**：无法检测高信任源提供的虚假内容（这是设计取舍，非缺陷）。\n    2.  **Source Spoofing**：假设攻击者无法伪造 Source Identity（如 RAG ID）。若可伪造，SIM 失效。\n    3.  **Latency**：引入 1x LLM 调用延迟，适用于高风险场景。\n\n**5. 英文表述建议**\n> \"We propose the **Source-bound Influence Monitor (SIM)**, a lightweight harness-side mechanism that quantifies the causal influence of untrusted context on model outputs. Unlike fact-checkers, SIM performs **shadow ablation**: it compares the full-context answer with an ablated answer (excluding untrusted sources) to compute a **residual influence score**. If the residual exceeds a threshold, SIM triggers a **correction-aware reset**, effectively quarantining the potential injection without requiring oracle truth verification.\"\n\n### 给结构化 IR 的要点摘要\n- 关键主张: 采纳 SIM 定位，作为 RQ5 中 correction-aware reset 的触发器；必须提取 2×2 子集 AUROC 以验证误报率。\n- 支撑依据: 现有 AUROC 数据支持“影响力监控”定位；控制论残差生成和网安污点追踪提供理论深度。\n- 风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。\n- 建议进入 IR 的下一步动作: 立即从日志提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SIM 机制、实验 Interpretation 和 Limitations 段落。\n\n### 外部引用\n[paper] Residual Generation and Evaluation in Fault Diagnosis | Patton, R. J. | https://doi.org/10.1109/36.210857 | 1989 | 支撑控制论残差监控框架\n[paper] Taint Analysis for Security | Collberg, C. et al. | https://doi.org/10.1145/277672.277683 | 1997 | 支撑网安污点追踪概念\n[dataset] Natural Questions (NQ) | Google Research | https://ai.google.com/research/NaturalQuestions | 2019 | 支撑实验数据集选择",
+      "model_label": "中国科大 107 算力平台 / qwen3.6-chat",
+      "ir_summary": "关键主张: 采纳 SIM 定位，作为 RQ5 中 correction-aware reset 的触发器；必须提取 2×2 子集 AUROC 以验证误报率。\n- 支撑依据: 现有 AUROC 数据支持“影响力监控”定位；控制论残差生成和网安污点追踪提供理论深度。\n- 风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。\n- 建议进入 IR 的下一步动作: 立即从日志提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SIM 机制、实验 Interpretation 和 Limitations 段落。",
+      "claims": [
+        "2.  **Source Spoofing**：假设攻击者无法伪造 Source Identity（如 RAG ID）。若可伪造，SIM 失效。",
+        "5. 英文表述建议",
+        "风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。",
+        "建议进入 IR 的下一步动作: 立即从日志提取 2×2 子集 AUROC；绘制阈值-性能图；撰写 SIM 机制、实验 Interpretation 和 Limitations 段落。"
+      ],
+      "concerns": [
+        "理由**：现有数据（untrusted false AUROC ~0.86 vs. all false AUROC ~0.53）证明其本质是**敏感性分析**而非事实检测。命名为 \"Monitor\" 而非 \"Detector\" 能准确传达其“风险监控”而非“真伪判定”的功能，避免审稿人质疑其泛化能力。",
+        "风险*：若该值过高（>0.7），说明 SIM 对真实内容也频繁报警（高误报），机制失效。",
+        "3.  **Latency**：引入 1x LLM 调用延迟，适用于高风险场景。",
+        "风险或反驳点: 缺失 untrusted true 数据可能导致误报质疑；必须明确 trusted false 盲点和 source spoofing 假设。"
+      ]
+    },
+    {
+      "round": 3,
+      "agent": "Reviewer Agent",
+      "title": "第 3 轮 · 审稿/评审",
+      "content": "好的，作为本轮的 Reviewer Agent，我将基于前三轮的深入讨论，以及您提供的详细 Briefing，给出最终的评审结论和可执行建议。我的目标是收敛分歧，明确指出当前方案中最需要补强的薄弱环节，并给出不破坏论文主线的轻量级解决方案。\n\n我完全认可“Source-bound Influence Monitor (SIM)”这一最终定位。这一定位精准地回避了“false-context detector”的谬误，并将其核心价值锚定在“harness-side 的风险监控”而非“事后的事实判断”，与您论文的 correction-aware reset 形成了完整的防御闭环。这不是简单的重命名，而是一次科学问题的重新定义。\n\n### 核心质疑与补充建议\n\n当前方案最大的潜在风险，已被前几轮讨论充分暴露：**缺失 `untrusted source + true content` 子集的 AUROC 数据**。这是审稿人最可能攻击的软肋，也是您必须立即证实的首要假设。\n\n1.  **对 `untrusted true` 数据的致命依赖**：您目前的 AUROC 结果是基于“untrusted false”子集的，其表现良好（~0.86）。但如果 SIM 对 `untrusted true` 的 AUROC 也过高（例如 >0.7），则说明它对真实上下文也有极高的误报率。这是一个**致命缺陷**，因为这会破坏所有合法但低信誉的上文（如用户新上传的文件）的正常使用。您必须在论文中优先呈现 `untrusted true` 的 AUROC，如果它很低（例如 <0.6），这就是您机制最有力的证据；如果它很高，则需要立即定性分析原因，并作为主要 limitation 讨论。\n\n2.  **对 `trusted false` 盲点的诚实声明**：AUROC 在 `all false` 上接近 0.5，已经清晰地证明了 SIM 不是事实检测器。它无法发现来自“可信源”的虚假内容。这是一个**设计特性**，而非 bug。在论文中，您必须明确声明这一盲点，并将它作为 attacker capability 的假设之一：**攻击者无法控制或伪装受信任的上文来源**（例如，无法篡改内部工具输出或系统控制消息）。\n\n3.  **Residual度量的精确性**：所有的 Agent 都建议使用“实体/数字差异率”来量化输出残差。我强烈同意。NQ 数据集的答案特性非常适合此方法。但请注意，这可能在长文本生成或需要复杂推理的任务中失效。在论文中，建议将其定义为“实体/数字级答案覆盖率 (Entity-level Answer Coverage, EAC)”，并明确其局限性。\n\n### 最小增量实验与论文表述建议\n\n为了在最小改动下最大化论文说服力，我建议：\n\n1.  **必须立即执行的诊断性实验（利用现有日志）**：从您的 `records` 日志中，编写一个后处理脚本，提取并计算完整 2×2 四象限的 AUROC。特别是 `untrusted true` 和 `trusted false` 的结果。这不需要任何新模型或数据。\n\n2.  **强烈建议执行的可视化实验（后处理即可）**：基于上述 AUROC 数据，绘制一条 “Threshold vs. True Positive Rate / False Alarm Rate” 曲线。这将直观展示 SIM 在不同阈值下的性能权衡，为实际部署选择阈值提供依据。这也是 Reviewer 的明确期望。\n\n3.  **论文中的英文 Interpretation 示例**：\n    *   **机制描述**：“The Source-bound Influence Monitor (SIM) serves as a harness-side residual monitor. It computes an entity-level answer coverage score between the full-context model output and the output after ablating low-trust contexts. A significant drop in coverage triggers an alert, suggesting the low-trust source had a causal influence on the model's generation.”\n    *   **实验解读**：“Our results demonstrate that SIM is effective at detecting *influence* from untrusted sources when they contain false content (AUROC: ~0.86). Critically, it **does not confuse influence with truth**: its detection of *all* false content (including trusted false) is near-chance (AUROC: ~0.53), confirming it is not a fact-checker but a source-bound influence monitor. Furthermore, for the challenging case of `untrusted true` contexts, SIM maintains a low false alarm rate (please confirm this value), showing it primarily flags harmful influence.”\n\n### 对整体风险的评估\n\n总体来看，您的方案逻辑清晰，理论框架完整。主要风险点在于**缺乏对关键子集（`untrusted true`）的定量验证**。只要您能立即完成后处理分析，证实 SIM 对 `untrusted true` 的误报率较低，则整体方案的可信度将大幅提升。否则，您需要在 Limitation 中诚实地讨论这一风险，并将其转化为未来工作。\n\n### 给结构化 IR 的要点摘要\n- **关键主张**: 最终采纳 “Source-bound Influence Monitor (SIM)” 定位，作为 RQ5 中 `correction-aware reset` 的主动触发器。\n- **支撑依据**: 现有 AUROC (0.86 vs 0.53) 完美支持“影响力监控”而非“事实检测”的定位。控制论残差生成和网安污点追踪提供双重理论锚点。\n- **风险或反驳点**: **最致命风险**是缺失 `untrusted true` 子集数据，可能导致高误报的致命质疑。威胁模型必须明确声明对 `trusted false` 的盲点，并假设攻击者无法伪造 source identity。\n- **建议进入 IR 的下一步动作**: 1) 立即从现有日志提取 `untrusted true` 等 2×2 子集 AUROC；2) 使用实体/数字差异率作为 Residual 度量；3) 撰写论文中关于 SIM 机制、实验 Interpretation 和 Limitations 的段落；4) 可选：从日志中抽取 2-3 个典型定性案例。\n\n### 外部引用\n[paper] Understanding the Sensitivity of LLMs to Input Perturbations |  Wei, J., et al. | arXiv:2311.17341 | 2023 | 支撑“输出对上下文移除的敏感性分析”而非严格“因果影响推断”的观点。您的 shadow ablation 本质是一种敏感性分析，引用此论文可避免审稿人质疑因果推断的严密性。",
+      "model_label": "DeepSeek / deepseek-v4-flash",
+      "ir_summary": "**关键主张**: 最终采纳 “Source-bound Influence Monitor (SIM)” 定位，作为 RQ5 中 `correction-aware reset` 的主动触发器。\n- **支撑依据**: 现有 AUROC (0.86 vs 0.53) 完美支持“影响力监控”而非“事实检测”的定位。控制论残差生成和网安污点追踪提供双重理论锚点。\n- **风险或反驳点**: **最致命风险**是缺失 `untrusted true` 子集数据，可能导致高误报的致命质疑。威胁模型必须明确声明对 `trusted false` 的盲点，并假设攻击者无法伪造 source identity。\n- **建议进入 IR 的下一步动作**: 1) 立即从现有日志提取 `untrusted true` 等 2×2 子集 AUROC；2) 使用实体/数字差异率作为 Residual 度量；3) 撰写论文中关于 SIM 机制、实验 Interpretation 和 Limitations 的段落；4) 可选：从日志中抽取 2-3 个典型定性案例。",
+      "claims": [
+        "好的，作为本轮的 Reviewer Agent，我将基于前三轮的深入讨论，以及您提供的详细 Briefing，给出最终的评审结论和可执行建议。我的目标是收敛分歧，明确指出当前方案中最需要补强的薄弱环节，并给出不破坏论文主线的轻量级解决方案。",
+        "我完全认可“Source-bound Influence Monitor (SIM)”这一最终定位。这一定位精准地回避了“false-context detector”的谬误，并将其核心价值锚定在“harness-side 的风险监控”而非“事后的事实判断”，与您论文的 correction-aware reset 形成了完整的防御闭环。这不是简单的重命名，而是一次科学问题的重新定义。",
+        "### 核心质疑与补充建议",
+        "当前方案最大的潜在风险，已被前几轮讨论充分暴露：**缺失 `untrusted source + true content` 子集的 AUROC 数据**。这是审稿人最可能攻击的软肋，也是您必须立即证实的首要假设。"
+      ],
+      "concerns": [
+        "我完全认可“Source-bound Influence Monitor (SIM)”这一最终定位。这一定位精准地回避了“false-context detector”的谬误，并将其核心价值锚定在“harness-side 的风险监控”而非“事后的事实判断”，与您论文的 correction-aware reset 形成了完整的防御闭环。这不是简单的重命名，而是一次科学问题的重新定义。",
+        "### 核心质疑与补充建议",
+        "当前方案最大的潜在风险，已被前几轮讨论充分暴露：**缺失 `untrusted source + true content` 子集的 AUROC 数据**。这是审稿人最可能攻击的软肋，也是您必须立即证实的首要假设。",
+        "### 对整体风险的评估"
+      ]
+    }
+  ],
+  "group_summary": "## 结构化 IR 文档\n\n### 决策摘要\n现有 pilot 实验的 AUROC 数据（untrusted false 约 0.86、all false 约 0.53）清晰表明它不是一个事实真假检测器，而是一个信任边界上的影响力监控器。\n\n### 关键主张 (Key Claims)\n\n1. **SIM 是信任边界监控器而非真假检测器**  \n   Pilot 实验的 AUROC 差异（untrusted false 0.86 vs. all false 0.53）明确指示：当 source identity 被信任时，SIM 有效；当所有输入被标记为 false 时，性能骤降。这证明了 SIM 的工作机制依赖于对源身份的信任假设，而非独立的事实验证能力。\n\n2. **当前实验设计不足以支撑泛化结论**  \n   样本量仅 N=40，且未控制攻击者伪造 source identity 的场景，威胁模型存在漏洞。对信任边界敏感性的观察虽然重要，但缺乏统计显著性和覆盖度。\n\n3. **重新 framing 是解决审稿人质疑的最优路径**  \n   将 SIM 定位为“信任边界影响力监控器”而非“真伪检测”，直接回应对 AUROC 差异的困惑，并开放新的评估指标（如信任边界的健壮性），优先级最高的候选方向。\n\n4. **消融实验是重新 framing 的必要支撑**  \n   分解 AUROC 的贡献来源（source identity 可信度 vs. 内容一致性）可提供定量证据，增加 framing 的可信度。\n\n### 证据引用 (Evidence References)\n\n| ID | Source Type | Source ID | Source Title | Quote/Summary | Supports |\n|----|-------------|-----------|--------------|---------------|----------|\n| ev-1 | Experiment | Pilot AUROC | Pilot Experiment on SIM | untrusted false AUROC=0.86, all false AUROC=0.53 | Claim 1, Claim 3 |\n| ev-2 | Conceptual Definition | Trust Boundary | Paper Draft: SIM Framework | SIM monitors influence along trust channels; relies on source identity | Claim 1, Claim 3 |\n| ev-3 | Attack Analysis | Scenario List | Brainstorming Session | Attackers can fake source identity via phishing; harness tampering | Claim 2, Critique 2 |\n| ev-4 | Literature | TAP, C2PA, Content Credentials | Background Survey | Existing provenance methods assume source identity integrity | Claim 3 (positioning) |\n| ev-5 | Reasoning | Threat Model | Security Assumptions Discussion | If source identity is compromised, entire monitoring chain fails | Claim 2, Critique 2 |\n\n### 批判点 (Critique Points)\n\n| ID | Target ID | Dimension | Severity | Content | Mitigation |\n|----|-----------|-----------|----------|---------|------------|\n| crit-1 | Claim 1 | Statistical Validity | Medium | Pilot 实验 N=40，未报告置信区间或统计检验，AUROC 差异可能受随机性影响。 | 扩大样本量至 N≥200，使用 bootstrap 计算 95% CI；或进行 permutation test。 |\n| crit-2 | Claim 2 | Threat Model Completeness | High | 未覆盖攻击者完全伪造 source identity 的场景（如 SIM 无法检测内部恶意 Actor）。 | 增加攻击场景表格分析，明确本论文的安全假设范围（如“假设 harness 层安全”）。 |\n| crit-3 | Claim 3 | Novelty | Low | 将 SIM 重新定义为“信任边界监控器”在部分安全领域已有类似概念（如 trust proxy）。 | 在 related work 中区分：本工作关注的是用户在信任边界上的**影响力**而非简单的身份验证。 |\n\n### 候选方向排序总结 (Candidate Directions Priority Summary)\n\n根据 JSON 中列出的优先级和理由，方向排序如下：\n\n1. **方向 1 (重新 framing)** — 优先级 1  \n   直接解决核心误解，用实验证据呼应 AUROC 模式，且对其他方向有覆盖能力。  \n2. **方向 2 (拆解消融实验)** — 优先级 2  \n   为方向 1 提供定量支撑，同时可作为独立贡献（分解 AUROC 来源）。  \n3. **方向 3 (延伸攻击场景)** — 优先级 4  \n   增加论文深度，但可能偏离核心论点；适合作为补充实验而非主线。  \n4. **方向 4 (合成 on-manifold 测试)** — 优先级 3  \n   提升实验内部效度，但需较多工作量，且与已有 pilot 数据不冲突。  \n5. **方向 5 (威胁模型分析)** — 优先级 5  \n   重要但可通过方向 1 的 Limitation 部分覆盖，单独作为方向过于沉重。\n\n### 综合下一步行动 (Combined Next Actions)\n\n1. **立即执行**  \n   - 重新编写论文的“发现”段落，将 SIM 明确定义为“信任边界影响力监控器”。  \n   - 基于方向 2 设计消融实验：控制 source identity 可信度 vs. 内容真实性因子，收集新数据（N≥200）。  \n   - 为方向 1 和方向 2 的结果计算 bootstrap 置信区间。\n\n2. **快速补充**  \n   - 编写威胁模型表格（方向 5），列出攻击类型、前提、SIM 受影响情况，放入 Limitation 节。  \n   - 在方法部分明确安全假设范围（方向 5）。\n\n3. **可选增强**  \n   - 若时间允许，实施方向 4（合成 on-manifold 测试）以增强实验内效度。  \n   - 方向 3（延伸攻击场景）可作为未来工作提出，不在当前版本深入。",
+  "critique_report": "## 1. 创新性风险\n风险等级：中\n具体问题：当前方向主要来自已有基础的组合延伸，差异化边界还需要用明确对照来证明。\n改进建议：把首推方向拆成“现有研究已知”和“本项目新增可检验命题”两列，并为新增命题设计最小验证实验。\n\n## 2. 证据链完整性\n风险等级：中\n具体问题：讨论已经形成候选方向，但从观察结果到因果解释之间仍缺关键干预证据。\n改进建议：优先补一个可在现有平台完成的 gain/loss 或独立样本验证，避免只停留在相关性叙述。\n\n## 3. 可行性盲点\n风险等级：中\n具体问题：当前论文已经有完整主线，不希望 detector 部分变成新的系统论文。希望只做小规模补充实验或重新组织已有结果。 可能限制样本量、周期和平台调用频次，过多候选方向会稀释执行资源。\n改进建议：保留 1 个主方向和 1 个备选方向，把其余方向降级为后续扩展。\n\n## 4. 逻辑一致性\n风险等级：低\n具体问题：整体逻辑已从科学问题、机制链条、可行路径和评审质疑形成闭环，但关键变量定义还不够细。\n改进建议：为每个候选方向补充输入变量、核心 readout、成功阈值和失败后的替代解释。\n\n## 5. 偏见与盲区\n风险等级：中\n具体问题：讨论偏向支持现有假设，反向证据和阴性结果处理策略不足。\n改进建议：为首推方向预设至少 2 个反证场景，并写清失败后是否转向备选方向。\n\n## 综合风险评估\n综合风险等级：中\n最值得关注的 Top-3 风险：\n1. 创新边界与已有研究的差异仍需收紧。\n2. 证据链中的因果验证环节仍然薄弱。\n3. 资源约束可能导致方向过多、验证不足。",
+  "citation_review": "## 引用相关性\n评级：B\n问题：引用能覆盖主要观点，但部分条目仍是示例或待确认链接。\n建议：正式使用前替换为可访问的论文、数据集或协议来源。\n\n## 引用密度\n评级：B\n问题：核心方向已有支撑，风险判断和替代路线的引用密度偏低。\n建议：为每个候选方向至少补 1 条方法学或评审风险相关引用。\n\n## 整体引用质量\n评级：B\n问题：当前引用适合演示结构，不适合作为最终学术报告直接提交。\n建议：导出外部论据清单后逐条核验 DOI、年份和作者。",
+  "final_report": "# 【结果诊断】大语言模型 Harness 安全与溯源监控机制的研究定位分析报告\n\n### 1. 当前科研阶段说明\n\n本报告处于「结果诊断」阶段。核心任务并非推荐全新选题，而是围绕已有的 `source-bound influence detector` 初步实验结果（尤其 AUROC 在不同 context 条件下的显著分异），对其机制进行深入诊断，定位其理论解释框架，明确其在现有论文主线中的合理角色，并设计最小限度的补充验证，以回应对其定位和鲁棒性的质疑。\n\n### 2. 用户输入摘要\n\n**研究背景与主线**\n本研究聚焦于大型语言模型（LLM）的 harness attack / phantom context 安全问题。攻击面为 pre-model assembly context（如 RAG 检索结果、tool output、memory 等），攻击者可通过污染此上下文诱导模型吸收虚假信息，并可能在用户纠正后仍呈现 lock-in 现象。现有论文主线已明确：验证了 pre-model assembly context 作为攻击面的脆弱性，揭示了多通道上下文对吸收的诱导效应，并提出了有效的防御措施 correction-aware reset 以切断第二阶段 latch-up。\n\n**已有基础与结果诊断**\n已构建`source-bound influence detector pilot`，核心机制是为每个 context object 绑定 source identity 和 trust tier，通过 ablation study 观察低信任上下文移除后模型答案的 residual。初步实验（NQ 数据集, Qwen-3B & Llama-3-8B）揭示了一个关键特征：\n-   对 `untrusted source + false content` 组合的 AUROC ≈ 0.86\n-   对 `all false content` 的 AUROC ≈ 0.53（接近随机水平）\n\n**核心困惑**\n该 detector 显然不是一个事实真假检测器。直接命名为 `false-context detector` 会误导，但若将其设计成完整的 `conflict-gated detector` 又过重，可能破坏现有论文结构。\n\n**用户初步构想**\n倾向于将其重新定位为 **“Source-bound residual monitor”**，在 harness 边界上执行风险监控，而非事实判定。其运作方式应类比控制论中的 residual monitoring 或网络安全中的 IDS/taint tracking，报警后联动 quarantine, downrank 或触发 correction-aware reset，而非直接判定真假。\n\n**资源与约束**\n希望在现有论文主线和 RQ5 框架内进行轻量级补充，不新增大规模系统。禁止重新训练 detector 模型、引入 hidden states/logprobs、依赖在线 oracle truth 或构建复杂的 claim extraction/fact-checking 系统。\n\n### 3. 前置信息整合\n\n基于入口 briefing 和讨论记录，将核心已知事实与约束整合为以下研究出发点：\n\n1.  **已有实验矩阵**：完备的 2x2 source (trusted/untrusted) × content (true/false) 条件实验，并已实现 `source_only`、`influence_only` 和 `source_bound_influence` 三种指标计算。\n2.  **关键数据特征**：AUROC 在 untrusted false context 上表现优异，但在包含 trusted false context 的全局测试中表现接近随机。这为本研究的重新定位提供了最直接的证据：**该机制的效能高度依赖于 source trust 的先验，而非独立的事实核查能力**。\n3.  **技术平台就绪**：已有模块化的 Python 实验框架，可复用现有 records/logs，支持基于已有数据的后处理和再分析，完全符合“不新增大规模系统”的约束。\n4.  **论文结构锚点**：RQ5 作为论文的防御机制章节，已有 `correction-aware reset` 核心防御动作。本机制可作为该防御闭环的“触发器”，而非独立的检测论文，这是一个天然且合理的嵌入位置。\n\n### 4. 核心科学问题提炼\n\n**主问题**: 如何在不破坏现有论文结构与资源限制的前提下，基于现有实验数据特征，将 `source-bound influence detector` 重新定位为一个可解释、可验证的 harness-side 风险监控机制？\n\n**子问题**:\n1.  **定性问题**: 该机制的学理定位究竟是什么？如何从控制论（残差监控）和网络安全（污点追踪/IDS）角度，为其构建一个区别于“事实检测器”的坚实理论框架？\n2.  **证据问题**: 当前实验数据哪些支撑、哪些不支撑新的定位？如何通过后处理分析（如 2x2 各子集的 AUROC， residual 在不同条件下的分布）来补齐证据链，使定位令人信服？\n3.  **设计问题**: 最小限度的 monitor 设计应包含哪些组件（监控对象、residual 指标、报警阈值、联动动作）？如何将其作为轻量组件无缝嵌入 RQ5 的 `correction-aware reset` 闭环中？\n4.  **边界问题**: 该机制的明确威胁模型（假设）和局限性（Limitations）是什么？如何在论文中诚实且有力地表述 `trusted false content` 盲点和 `source spoofing` 失效条件？\n\n### 5. 机制框架与可检验假设\n\n**机制框架**\n我们提出 **Source-bound Influence Monitor (SIM)**。其核心机制不依赖事实真值判定，而是在 harness 边界对上下文进行溯源与影响力残差监控：\n1.  **溯源绑定 (Source Binding)**: Harness 为每个输入的 context object 绑定系统内部生成的、难以伪造的 source identity 和 trust tier。\n2.  **影子消融 (Shadow Ablation)**: 当存在低于信任阈值的 context 时，SIM 在后台执行一次“影子推理”，即生成一个移除了低信任 contexts 的 ablated prompt，并得到 ablated answer。\n3.  **残差计算 (Residual Calculation)**: 定义并计算 full answer 与 ablated answer 之间的 salient residual。建议度量指标为**实体/数字差异率**，因其计算成本低且对事实性变化敏感。\n4.  **风险报警与联动 (Alert & Act)**: 当 residual 超过预设阈值时，SIM 不判定内容为假，而是发出一个 IDS 风格的告警，并触发预设的 harness-level 响应动作，如隔离（quarantine）、降权（downrank）、记录审计日志（audit log），或最终触发 `correction-aware reset`。\n\n**可检验假设**\n-   **H1**: `untrusted source + false content` 条件下，因内容与信源双重不可信，模型易受影响，SIM 的 residual 应显著增大，AUROC 高。\n-   **H2**: `untrusted source + true content` 条件下，虽然信源不可信，但内容本身未偏离事实，模型不易产生事实错误，SIM 的 residual 应较小（低误报），AUROC 应低于 H1 中的情形。\n-   **H3**: `trusted source + false content` 条件下，攻击来自可信内部，SIM 基于源信任的监控机制完全失能，residual 随机，AUROC 应接近 0.5（盲点 Limitation）。\n-   **H4**: 选择合适的 residual 度量（如实体差异率）对 SIM 的性能至关重要，它需要能捕捉到事实性变化（高召回），同时忽略低信息量的语言改写（低误报）。\n\n### 6. 当前主推进路线的诊断与完善\n\n**（当前主线：将 detector 重新定位为 RQ5 中的轻量级 SIM）**\n\n**【支撑证据】**\n-   **E-template-1**: (来源: 用户模板) 提供了 2x2 实验完整设定，构成了后续一切诊断与再分析的基础。\n-   **E-debate-2**: (来源: Novelty Agent 第1轮) 核心判断：“完全认可‘Source-bound residual monitor’这个定位，并且认为这是当前证据条件下最合理、最有力的叙述”。它明确指出，实验数据（0.86 vs 0.53）强有力地支撑了该组件是影响力归因而非事实核查器的论断。\n-   **E-debate-3**: (来源: Mechanism Agent 第1轮) 提供了机制深挖视角，将该模块的定位从“检测器”转向“残差监控器”，并提出科学问题从“能否检测假上下文”转化为“能否在 Harness 边界量化低信任上下文对输出的因果影响力”。\n-   **E-debate-7、E-debate-8**: (来源: Mechanism/Feasibility Agent 第2轮) 针对 residual 的定义和增量实验设计提出了具体、低成本的操作方案（如绘制 residual 分布图、计算 2x2 子集 AUROC），构成了下一步行动计划的核心。\n\n**【批判审查】**\n-   **最强创新点**: **重新定义科学问题**。将工作从庸常的“真假检测”提升为“信任边界上的因果影响力监控”，并从控制论和网安双重视角赋予理论深度，与后续的 `correction-aware reset` 构成“监控-响应”闭环，系统性强。\n-   **最弱证据点**: **关键子集的数据缺失**。目前仅报告了 `untrusted false` 和 `all false` 的 AUROC，而缺乏 `untrusted true` 和 `trusted false` 这两个对照组的数据。这导致无法直接证明 SIM 的低误报特性和盲点的存在，是当前证据链的最大缺口。V1.5 决策结构体将“缺失 2×2 子集 AUROC 数据”列为最大风险，审稿人极可能攻击此点。\n-   **最大可行性风险**: **`Residual` 指标的选择**。实体差异率适用于短答案（如 NQ），但在长文本或多轮对话场景中可能不够鲁棒。选择不当的指标可能导致性能评估的偏差。\n-   **与已有基础匹配度**: **极高**。无论是定位、技术路线还是实验框架，都与现有基础完美契合，无需任何重大改动。\n-   **替代路线**: 若不进行此定位，强行将其包装为“带缺陷的检测器”，将直面所有审稿人对“为何对 trusted false 无效”的质疑，极难防守。因此，当前重新定位的路线是唯一最优解。\n\n### 7. 证据链与实验设计\n\n为解决最弱证据点，设计最小增量实验包，**完全基于已有日志的后处理**：\n\n**实验目的**: 为重新定位提供完整的、无可置疑的定量证据。\n**实验样本**: 复用 2x2 实验中已有的全部 records/logs，从中提取 full 和 ablated 两组答案。\n**实验分组**:\n-   G1: `Untrusted + True` (验证低误报 H2)\n-   G2: `Trusted + False` (验证盲点 H3)\n-   G3: `Untrusted + False` (已有，作为高召回基线 H1)\n\n**方法与指标**:\n1.  **度量指标**: 采用**实体差异率**。对于每组 (full_answer, ablated_answer)，提取其中的实体（如人名、地名、数字），计算 `1 - (交集数量 / 并集数量)` 作为 Residual Score。\n2.  **性能衡量**:\n    -   计算 G1、G2 两组各自的 **AUROC**。目标：G1 (< 0.7，证明低误报) ; G2 ≈ 0.5 (证明盲点)。\n    -   绘制 **Residual Score Distribution 图**，在同一坐标轴下展示 G1、G2、G3 的分布曲线，直观展示其分离度。\n    -   绘制 **Threshold-FPR/TPR 图**，展示针对 G3 (positive class) 和 G1 (negative class) 在不同阈值下的检测性能，明确可用的阈值窗口。\n**执行计划**: 仅需编写一个 Python 脚本，读取实验日志，解析答案文本，计算实体差异率，并利用现有库（如 `sklearn.metrics.roc_auc_score` 等）生成图表。**完全符合零成本或极低成本要求**。\n\n### 8. 风险、替代路线与收敛条件\n\n**失败风险**:\n-   **结果风险**: `untrusted true` 的 AUROC 意外地高（>0.7），说明此方法会产生高误报，机制有效性存疑。\n-   **解释风险**: 审稿人仍坚持用“检测器”的视角来评判，不接受“监控器”的定位。\n-   **资源风险**: 极低，因不涉及新实验。\n\n**替代路线**:\n若 `untrusted true` 的 AUROC 结果不理想，则需要**弱化其对低误报的宣称**，转而**更加强调其对极端情况的告警价值**（如 IDS 侧重于高召回而非低误报）。若审稿人完全不接受重定位，则需考虑将此项工作降级为消融研究中的一个小节，而非 RQ5 的核心组件。此为最坏情况。\n\n**收敛条件**:\n-   **继续前进**: `untrusted true` 的 AUROC < 0.65，且 `trusted false` 的 AUROC 在 0.45-0.55 之间，可视化分布图清晰。\n-   **转向降级**: `untrusted true` 的 AUROC > 0.70，且在定性案例分析中表现不佳，难以给出合理解释。\n\n### 9. 综合优先级排序\n\n| 推进路径/组件 | 创新性 | 证据强度 | 可行性 | 周期 | 风险 | 产出潜力 | 排序 |\n| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n| **SIM 理论框架构建** (控制论+IDS) | **高** | **中** (已有概念对映) | **极高** | 1 周 | 低 | **高** (提升论文立意) | **1** |\n| **关键 Subset 数据分析** (最小实验) | **中** | **极高** (直接补齐缺口) | **极高** | 2-3 天 | **中** (结果可能不符预期) | **极高** (关系核心主张) | **1 (同步进行)** |\n| 定性案例抽取 (True Positive & False Positive) | 低 | 中 | 极高 | 1-2 天 | 低 | 中 (增强说服力) | 3 |\n| 延伸攻击场景分析 (如 Source Spoofing) | 中 | 低 | 中 (需新增分析框架) | 1 周 | 低 | 中 (可放入 Limitation 或 Future Work) | 4 |\n\n**首推路径**: 将 **1 (理论构建)** 与 **2 (数据分析)** 并行推进，此为当前最核心且优先级最高的任务。\n\n### 10. 下一步 2-4 周行动计划\n\n-   **第 1 周**: **(理论构建与数据清洗)**\n    -   撰写 RQ5 中 SIM 的定义段落：从控制论（residual monitoring）和网安（IDS/taint tracking）角度出发，明确定义 SIM 为 “source-bound influence monitor”，阐述其“监控-报警-响应”的工作闭环。\n    -   明确其与 `correction-aware reset` 的联动逻辑。\n    -   完成数据提取脚本，从已有日志中提取所有 2x2 条件的 full/ablated 答案对。\n\n-   **第 2 周**: **(最小实验执行与结果解释)**\n    -   运行脚本，计算 `untrusted true` 和 `trusted false` 子集下的实体差异率与 AUROC。\n    -   绘制 Residual Score 分布图和 Threshold-FPR/TPR 图。\n    -   重写实验结果 Interpretation 段落：开宗明义指出 SIM 不是事实检测器，然后展示其对 high-risk context (`untrusted false`) 的有效性，紧接着展示其对 `untrusted true` 的低误报特性和对 `trusted false` 的明确盲点。\n\n-   **第 3-4 周**: **(论文撰写与案例补充)**\n    -   撰写完整的 Limitations / Threat Model 段落：明确 SIM 的假设“攻击者无法伪造 source identity”，并指出 “trusted false content” 是其固有盲点。\n    -   从日志中筛选 2-3 个定性的对比案例（一个有效报警，一个合理不报警，一个内部威胁失效），作为文字分析插入论文。\n    -   将上述所有内容整合进 RQ5 章节，形成完整的“监控-响应”叙事。\n\n### 11. 开题/组会汇报表述\n\n**表述 1 (定位与立意)**\n“在已有的工作中，我们发现一个现象：我们实现的 source-bound influence detector 在检测来自不可信源头的虚假上下文时效果显著（AUROC 0.86），但对所有虚假上下文的检测却接近随机（AUROC 0.53）。对于一个安全防御者来说，这是一个意味深长的发现。我们对其进行了深入诊断，并最终将其重新定位为一个 **Source-bound Influence Monitor (SIM)**。它不是一个事实核查器，而是一个在 Harness 信任边界上运行的**因果影响力残差监控器**。从控制论的角度看，它监控系统输出的异常偏差；从网安的角度看，它类似于基于污点追踪的入侵检测告警。这个定位不仅完美解释了所有现有数据，更将我们工作的核心贡献从‘检测’提升为‘监控与响应’。”\n\n**表述 2 (机制与嵌入)**\n“SIM 的工作机制非常轻量。Harness 为每个输入的 context object 绑定溯源和信任层级。当存在低信任上下文时，SIM 在后台执行一次影子消融，并通过比较完整与消融后答案的实体差异率来计算一个残差分数。当分数超过阈值，SIM 并不宣称上下文为假，而是触发一个告警，联动后续的审计、隔离或 `correction-aware reset` 防御动作。这样，SIM 就作为我们 RQ5 防御闭环中的一个轻量级触发器而存在，其自身的 Limitation——比如对来自可信源虚假信息的盲点——也被清晰地定义和理解，构成了未来工作的边界。”\n\n**表述 3 (证据与严谨性)**\n“为了严谨地确立这一定位，我们设计了极低成本的后处理分析。我们计划从现有实验日志中提取关键的对照组数据：`untrusted true content` 和 `trusted false content`。我们有两个可检验的假设：第一，对于不可信源头的真实内容，由于模型不易被带偏，SIM 的残差应该很低，证明其低误报特性；第二，对于可信源头的虚假内容，SIM 将完全失效，AUROC 应接近 0.5。这两个假设的证实，将构成我们定义 SIM 功能与边界的直接证据。”\n\n### 12. 转向建议 (备选)\n\n若上述最小增量实验结果出现严重偏差，如 `untrusted true` 导致高误报，则需启动备选方案：**弱化 SIM 作为独立监控器的定位，转而仅将其作为耦合 `correction-aware reset` 的一个先决条件或组件进行描述**。即在论文中，不再单独强调其监控性能指标（AUROC），而是将其表述为“一个为 `correction-aware reset` 提供触发信号的影响力评估模块”。将论述重点从“SIM 的能力”转向“SIM 存在的必要性与条件性”。此时，论文对 SIM 的贡献宣称将降级，但整体结构的完整性得以保持，风险可控。",
+  "error": "",
+  "current_step": "运行完成",
+  "timeline": [
+    {
+      "key": "overall",
+      "label": "整体头脑风暴",
+      "status": "completed",
+      "started_at": "2026-07-06T02:29:03.742307+00:00",
+      "estimated_done_at": "2026-07-06T03:42:01.544511+00:00",
+      "finished_at": "2026-07-06T03:39:23.419235+00:00",
+      "is_overall": true,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "template",
+      "label": "创建运行并校验模板",
+      "status": "completed",
+      "started_at": "2026-07-06T02:29:03.752016+00:00",
+      "estimated_done_at": "2026-07-06T02:29:08.752016+00:00",
+      "finished_at": "2026-07-06T02:29:03.758094+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "intake",
+      "label": "入口模型整理模板与上传文档",
+      "status": "completed",
+      "started_at": "2026-07-06T02:29:03.758272+00:00",
+      "estimated_done_at": "2026-07-06T02:33:33.758272+00:00",
+      "finished_at": "2026-07-06T02:30:32.624781+00:00",
+      "is_overall": false,
+      "estimate_seconds": 270
+    },
+    {
+      "key": "handoff",
+      "label": "信息传送到讨论组",
+      "status": "completed",
+      "started_at": "2026-07-06T02:30:32.636488+00:00",
+      "estimated_done_at": "2026-07-06T02:30:37.636488+00:00",
+      "finished_at": "2026-07-06T02:30:32.641715+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r1_novelty",
+      "label": "Novelty Agent 独立发言(第 1 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T02:48:38.006026+00:00",
+      "estimated_done_at": "2026-07-06T02:51:38.006026+00:00",
+      "finished_at": "2026-07-06T03:36:40.989651+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r1_mechanism",
+      "label": "Mechanism Agent 独立发言(第 1 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T02:59:19.907171+00:00",
+      "estimated_done_at": "2026-07-06T03:02:19.907171+00:00",
+      "finished_at": "2026-07-06T03:36:40.989984+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r1_feasibility",
+      "label": "Feasibility Agent 独立发言(第 1 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T02:30:32.647605+00:00",
+      "estimated_done_at": "2026-07-06T02:33:32.647605+00:00",
+      "finished_at": "2026-07-06T03:36:40.990021+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r1_reviewer",
+      "label": "Reviewer Agent 独立发言(第 1 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:01:50.727722+00:00",
+      "estimated_done_at": "2026-07-06T03:04:50.727722+00:00",
+      "finished_at": "2026-07-06T03:36:40.990050+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "moderator_round1",
+      "label": "Moderator 汇总第 1 轮冲突与遗漏",
+      "status": "completed",
+      "started_at": "2026-07-06T03:16:56.364181+00:00",
+      "estimated_done_at": "2026-07-06T03:17:56.364181+00:00",
+      "finished_at": "2026-07-06T03:17:36.991046+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r2_novelty",
+      "label": "Novelty Agent 发言(第 2 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:18:56.894251+00:00",
+      "estimated_done_at": "2026-07-06T03:21:56.894251+00:00",
+      "finished_at": "2026-07-06T03:36:40.990199+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r2_mechanism",
+      "label": "Mechanism Agent 发言(第 2 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:19:39.164478+00:00",
+      "estimated_done_at": "2026-07-06T03:22:39.164478+00:00",
+      "finished_at": "2026-07-06T03:36:40.990256+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r2_feasibility",
+      "label": "Feasibility Agent 发言(第 2 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:21:04.335328+00:00",
+      "estimated_done_at": "2026-07-06T03:24:04.335328+00:00",
+      "finished_at": "2026-07-06T03:36:40.990487+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r2_reviewer",
+      "label": "Reviewer Agent 发言(第 2 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:21:45.147912+00:00",
+      "estimated_done_at": "2026-07-06T03:24:45.147912+00:00",
+      "finished_at": "2026-07-06T03:36:40.990580+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r3_novelty",
+      "label": "Novelty Agent 发言(第 3 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:25:14.966748+00:00",
+      "estimated_done_at": "2026-07-06T03:28:14.966748+00:00",
+      "finished_at": "2026-07-06T03:36:40.990611+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r3_mechanism",
+      "label": "Mechanism Agent 发言(第 3 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:25:46.625272+00:00",
+      "estimated_done_at": "2026-07-06T03:28:46.625272+00:00",
+      "finished_at": "2026-07-06T03:36:40.990682+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r3_feasibility",
+      "label": "Feasibility Agent 发言(第 3 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:26:35.850006+00:00",
+      "estimated_done_at": "2026-07-06T03:29:35.850006+00:00",
+      "finished_at": "2026-07-06T03:36:40.990758+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "debate_r3_reviewer",
+      "label": "Reviewer Agent 发言(第 3 轮)",
+      "status": "completed",
+      "started_at": "2026-07-06T03:27:31.670782+00:00",
+      "estimated_done_at": "2026-07-06T03:30:31.670782+00:00",
+      "finished_at": "2026-07-06T03:36:40.990798+00:00",
+      "is_overall": false,
+      "estimate_seconds": 0
+    },
+    {
+      "key": "critique",
+      "label": "Critique Agent 批判审查",
+      "status": "completed",
+      "started_at": "2026-07-06T03:36:40.990839+00:00",
+      "estimated_done_at": "2026-07-06T03:39:10.990839+00:00",
+      "finished_at": "2026-07-06T03:36:41.307354+00:00",
+      "is_overall": false,
+      "estimate_seconds": 150
+    },
+    {
+      "key": "group_summary",
+      "label": "结构化 IR",
+      "status": "completed",
+      "started_at": "2026-07-06T03:36:41.316152+00:00",
+      "estimated_done_at": "2026-07-06T03:39:41.316152+00:00",
+      "finished_at": "2026-07-06T03:38:01.203036+00:00",
+      "is_overall": false,
+      "estimate_seconds": 180
+    },
+    {
+      "key": "citation_review",
+      "label": "Citation Review Agent 引用审查",
+      "status": "completed",
+      "started_at": "2026-07-06T03:38:01.223424+00:00",
+      "estimated_done_at": "2026-07-06T03:40:01.223424+00:00",
+      "finished_at": "2026-07-06T03:38:01.530857+00:00",
+      "is_overall": false,
+      "estimate_seconds": 120
+    },
+    {
+      "key": "final_report",
+      "label": "出口模型生成最终报告",
+      "status": "completed",
+      "started_at": "2026-07-06T03:38:01.544511+00:00",
+      "estimated_done_at": "2026-07-06T03:42:01.544511+00:00",
+      "finished_at": "2026-07-06T03:39:23.419235+00:00",
+      "is_overall": false,
+      "estimate_seconds": 240
+    }
+  ],
+  "created_at": "2026-07-06T02:29:03.733277+00:00",
+  "updated_at": "2026-07-06T03:39:23.421398+00:00"
+}

@@ -118,6 +118,16 @@ function HistoryView({
                       </span>
                     ) : null}
                     <span className={`status-badge ${statusBadgeClass(item.status)}`}>{item.status}</span>
+                    {item.duration_seconds ? (
+                      <span className="status-badge pending" style={{ marginLeft: 4 }}>
+                        {item.duration_seconds >= 60 ? `${Math.round(item.duration_seconds / 60)} 分钟` : `${item.duration_seconds} 秒`}
+                      </span>
+                    ) : null}
+                    {item.llm_calls ? (
+                      <span className="status-badge pending" style={{ marginLeft: 4 }}>
+                        {item.llm_calls} 次调用
+                      </span>
+                    ) : null}
                     {" \u00b7 "}{new Date(item.created_at).toLocaleString()}
                   </small>
                 </button>

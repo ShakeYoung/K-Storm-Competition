@@ -713,6 +713,7 @@ function App() {
                 updateDocument={updateDocument}
                 removeDocument={removeDocument}
                 onSubmit={handleCreateAndGo}
+                onOpenRun={(runId) => { openRun(runId); setActivePage("debate"); }}
                 mode={discussionMode}
                 runName={runName}
                 setRunName={setRunName}
@@ -1218,6 +1219,19 @@ function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmR
           <BriefBlock title="未知问题" items={brief.unknowns} />
           <BriefBlock title="约束条件" items={brief.constraints} />
           <BriefBlock title="机会点" items={brief.opportunity_points} />
+          {brief.omitted_notes?.length ? (
+            <div className="brief-block brief-wide omitted-notes">
+              <h3>⚠️ 因预算省略的关键点</h3>
+              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 8 }}>
+                大文档摘要模式下，以下信息可能重要但未进入分析，请人工确认是否需要补充。
+              </p>
+              <ul>
+                {brief.omitted_notes.map((note, i) => (
+                  <li key={i}>{note}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {brief.intake_synthesis ? (
             <div className="brief-block brief-wide">
               <CollapsibleMarkdown title="入口整合 Briefing" content={brief.intake_synthesis} />
@@ -1681,6 +1695,8 @@ function DebateView({ run, streamingPartial }) {
   const [showChart, setShowChart] = React.useState(true);
   const [expandedMsg, setExpandedMsg] = React.useState(null);
   const [searchKeyword, setSearchKeyword] = React.useState("");
+  const [interjectText, setInterjectText] = React.useState("");
+  const [interjectBusy, setInterjectBusy] = React.useState(false);
   const searchRef = React.useRef(null);
 
   const grouped = React.useMemo(() => {
@@ -1803,8 +1819,13 @@ function DebateView({ run, streamingPartial }) {
                 const renderedHtml = kw
                   ? highlightKeyword(markdownToHtml(message.content), kw)
                   : markdownToHtml(message.content);
+                const isHuman = message.is_human || message.agent === "你";
                 return (
-                <article className="agent-card" data-agent={agentKeyFromDisplay(message.agent)} key={`${message.round}-${message.agent}`}>
+                <article
+                  className={`agent-card ${isHuman ? "human-card" : ""}`}
+                  data-agent={isHuman ? "human" : agentKeyFromDisplay(message.agent)}
+                  key={`${message.round}-${message.agent}-${message.title || ""}`}
+                >
                   <div className="agent-card-header">
                     <strong>{message.agent}</strong>
                     <span className="agent-model-label">{message.model_label || ""}</span>
@@ -1849,6 +1870,43 @@ function DebateView({ run, streamingPartial }) {
                 );
               })()}
             </div>
+            {/* 人工介入：在当前轮 agent 发言后插入意见，下一轮 agent 自动携带 */}
+            {run?.run_id && !kw ? (
+              <div className="human-interjection-bar">
+                <textarea
+                  className="human-interjection-input"
+                  rows={2}
+                  value={interjectText}
+                  placeholder={`对第 ${activeRound} 轮的讨论补充你的意见或约束（提交后下一轮 Agent 会参考这条意见）…`}
+                  onChange={(e) => setInterjectText(e.target.value)}
+                  disabled={interjectBusy}
+                />
+                <button
+                  className="icon-button human-interjection-submit"
+                  disabled={interjectBusy || !interjectText.trim()}
+                  onClick={async () => {
+                    if (!interjectText.trim()) return;
+                    setInterjectBusy(true);
+                    try {
+                      const resp = await fetch(`${API_BASE}/api/runs/${run.run_id}/interject`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ round: activeRound, content: interjectText.trim() }),
+                      });
+                      if (!resp.ok) throw new Error("提交失败");
+                      setInterjectText("");
+                    } catch {
+                      // 忽略，SSE 会刷新
+                    } finally {
+                      setInterjectBusy(false);
+                    }
+                  }}
+                >
+                  <ArrowUpCircle size={16} />
+                  <span>{interjectBusy ? "提交中" : "插入意见"}</span>
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : (

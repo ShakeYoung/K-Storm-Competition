@@ -1,11 +1,34 @@
 import React from "react";
-import { BookOpen, RefreshCw } from "lucide-react";
+import { BookOpen, RefreshCw, ShieldCheck } from "lucide-react";
 import { API_BASE, readError, statusBadgeClass } from "../lib/constants.js";
 import { markdownToHtml } from "../lib/markdown.js";
 import DownloadMenu from "./DownloadMenu.jsx";
 
+const VERIFY_LABEL = {
+  verified: { text: "已核验", cls: "completed", icon: "✓" },
+  mismatch: { text: "不一致", cls: "failed", icon: "⚠" },
+  not_found: { text: "未找到", cls: "pending", icon: "?" },
+  pending: { text: "待核验", cls: "pending", icon: "⏳" },
+  skipped: { text: "跳过", cls: "pending", icon: "–" },
+};
+
+function VerifyBadge({ verification }) {
+  if (!verification) return null;
+  const meta = VERIFY_LABEL[verification.status] || VERIFY_LABEL.pending;
+  return (
+    <span
+      className={`status-badge ${meta.cls}`}
+      title={verification.detail || ""}
+      style={{ fontSize: 10, marginLeft: 6, cursor: "help" }}
+    >
+      {meta.icon} {meta.text} · {verification.source}
+    </span>
+  );
+}
+
 function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun }) {
   const [busy, setBusy] = React.useState(false);
+  const [verifying, setVerifying] = React.useState(false);
   const allRuns = React.useMemo(
     () => history,
     [history],
@@ -35,6 +58,32 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
       setError(err.message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function verifyRefs() {
+    if (!run?.run_id) return;
+    setVerifying(true);
+    setError("");
+    try {
+      const resp = await fetch(`${API_BASE}/api/runs/${run.run_id}/references/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (!resp.ok) {
+        const detail = await readError(resp);
+        throw new Error(detail || "核验失败");
+      }
+      const data = await resp.json();
+      setRun(data);
+      const verified = (data.external_references || []).filter((r) => r.verification?.status === "verified").length;
+      const pending = (data.external_references || []).filter((r) => ["pending", "not_found", "mismatch"].includes(r.verification?.status)).length;
+      setError(`在线核验完成：${verified} 条已核验存在，${pending} 条需人工核实或未找到。`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -139,13 +188,23 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
             <p>讨论过程中各 Agent 引用的外部论文、博客、数据集等论据。</p>
           </div>
           {run ? (
-            <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+            <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
               <button className="icon-button" disabled={busy} onClick={() => fetchRefs(false)} style={{ whiteSpace: "nowrap", fontSize: 12, minHeight: 32 }}>
                 <RefreshCw size={14} className={busy ? "spin" : ""} />
                 <span>重新提取</span>
               </button>
               <button className="icon-button" disabled={busy} onClick={() => fetchRefs(true)} style={{ whiteSpace: "nowrap", fontSize: 12, minHeight: 32 }}>
                 <span>+ 更新论据</span>
+              </button>
+              <button
+                className="icon-button"
+                disabled={verifying || !refs.length}
+                onClick={verifyRefs}
+                style={{ whiteSpace: "nowrap", fontSize: 12, minHeight: 32, background: "var(--accent-soft)", borderColor: "var(--accent)", color: "var(--accent-strong)" }}
+                title="对 arXiv/Crossref/OpenReview 在线核验引用真实性"
+              >
+                <ShieldCheck size={14} className={verifying ? "spin" : ""} />
+                <span>{verifying ? "核验中…" : "在线核验"}</span>
               </button>
               <DownloadMenu label="导出" disabled={!refs.length} mdContent={buildRefsMD()} pdfContent={buildRefsMD()} pdfTitle={`K-Storm 外部论据 ${run?.run_id || ""}`} />
             </div>
@@ -178,19 +237,30 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
                 <div style={{ display: "grid", gap: 8 }}>
                   {items.map((ref) => {
                     const vp = ref.cited_viewpoint ? ref.cited_viewpoint.replace(/^[\s]*支撑观点[：:]/, "").trim() : "";
+                    const titleLine = ref.url && ref.url !== "待确认" ? `[${ref.title || "未命名"}](${ref.url})` : (ref.title || "未命名");
                     const md = [
-                      `**${ref.url && ref.url !== "待确认" ? `[${ref.title || "未命名"}](${ref.url})` : (ref.title || "未命名")}${ref.year ? ` (${ref.year})` : ""}**`,
+                      `**${titleLine}${ref.year ? ` (${ref.year})` : ""}**`,
                       ref.authors ? `**作者**：${ref.authors}` : null,
                       vp ? `**支撑观点**：${vp}` : null,
                       `*引用阶段：${ref.citing_agent || ""} · 第 ${ref.round || "?"} 轮*`,
                     ].filter(Boolean).join("\n\n");
                     return (
                       <div key={ref.id} style={{ background: "var(--panel-muted)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "12px 16px" }}>
-                        <div
-                          className="markdown-rendered"
-                          style={{ fontSize: 13, lineHeight: 1.6 }}
-                          dangerouslySetInnerHTML={{ __html: markdownToHtml(md) }}
-                        />
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                          <div
+                            className="markdown-rendered"
+                            style={{ fontSize: 13, lineHeight: 1.6, flex: 1, minWidth: 0 }}
+                            dangerouslySetInnerHTML={{ __html: markdownToHtml(md) }}
+                          />
+                          <VerifyBadge verification={ref.verification} />
+                        </div>
+                        {ref.verification?.matched_title && ref.verification.status !== "skipped" ? (
+                          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 4, lineHeight: 1.5 }}>
+                            <span style={{ fontWeight: 600 }}>核验匹配：</span>{ref.verification.matched_title}
+                            {ref.verification.matched_authors ? ` · ${ref.verification.matched_authors}` : ""}
+                            {ref.verification.matched_year ? ` (${ref.verification.matched_year})` : ""}
+                          </div>
+                        ) : null}
                       </div>
                     );
                   })}

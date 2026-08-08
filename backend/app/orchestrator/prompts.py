@@ -231,7 +231,8 @@ def intake_prompt(template: TemplateInput, documents: list[UploadedDocument]) ->
 5. 输出中文 Markdown,结构清晰,供后续讨论 Agent 直接使用;后续讨论组不会再看到文档全文。
 6. 严格控制长度:优先高密度信息,不写长篇报告;建议 1800-3000 中文字,最多不超过 4000 中文字。
 7. 对每份上传文档只保留对选题讨论必要的信息:核心设计、关键数据、已验证结论、约束和待验证问题;删除重复背景和无关细节。
-8. 最后一行必须输出:<<<END_OF_INTAKE>>>
+8. {'**因当前使用摘要模式（非全文），请在末尾追加"## 因预算省略的关键点"小节，列出 3-5 条文档中可能重要但摘要未覆盖的信息点，供用户人工确认是否需要补充。**' if use_hybrid else ''}
+9. 最后一行必须输出:<<<END_OF_INTAKE>>>
 """.strip()
 
 def template_prompt(template: TemplateInput) -> str:
@@ -470,8 +471,10 @@ def critique_prompt(
 def citation_review_prompt(
     template: TemplateInput,
     messages: list[DebateMessage],
+    verifications: list | None = None,
 ) -> str:
-    """引用真实性审查 prompt：对所有 Agent 引用的文献进行语义交叉验证。"""
+    """引用真实性审查 prompt：对所有 Agent 引用的文献进行语义交叉验证。
+    若 verifications 非空，注入在线核验结果供 Agent 参考。"""
     ref_lines = []
     for msg in messages:
         # 从每条发言中提取外部引用小节
@@ -488,10 +491,29 @@ def citation_review_prompt(
                 if line:
                     ref_lines.append(f"[{msg.agent} R{msg.round}] {line}")
     refs_text = "\n".join(ref_lines) if ref_lines else "（讨论中未发现结构化引用行，请基于发言正文分析引用情况）"
+
+    # 注入在线核验状态（若有）
+    verification_text = ""
+    if verifications:
+        verified_lines = []
+        for ver in verifications:
+            v = ver if isinstance(ver, dict) else (ver.model_dump() if hasattr(ver, "model_dump") else {})
+            status = v.get("status", "")
+            if status == "skipped":
+                continue
+            title = v.get("matched_title", "")
+            source = v.get("source", "")
+            verified_lines.append(f"- [{source}] 状态={status} | 匹配标题={title}")
+        if verified_lines:
+            verification_text = "\n\n## 系统已执行的在线核验结果（仅供参考，不替代你的线索审查）\n" + "\n".join(verified_lines)
+        else:
+            verification_text = "\n\n## 系统在线核验：本次无可核验引用（均缺少 DOI/arXiv id），请按常规方式审查。\n"
+
     return f"""
 你是引用线索审查 Agent。请对以下讨论中各 Agent 引用的外部文献进行线索一致性、完整性和相关性的检查。
 
-重要边界：你只能基于讨论文本本身做线索层面的交叉检查，不能访问外部文献数据库（如 Crossref、OpenAlex、Semantic Scholar）。因此你的检查不能替代对文献真实存在性的核实——对于无法在讨论文本中交叉印证的引用，应标注「需人工核实」，而不是断言其真实或虚假。
+边界说明：你的核心审查基于讨论文本做线索层面交叉检查。系统会对部分引用执行在线核验（arXiv/Crossref），结果见下方。已核验存在的引用可更确信其真实性；未核验或待人工核实的引用，应明确提示用户需人工确认，不要断言其真实或虚假。
+{verification_text}
 
 研究领域：{template.field}
 
@@ -826,6 +848,29 @@ def _extract_ir_summary(content: str) -> str:
     if stop:
         tail = tail[: stop.start()]
     return tail.strip()[:900]
+
+
+def extract_omitted_notes(content: str) -> list[str]:
+    """从 intake 输出中提取「## 因预算省略的关键点」小节的条目。
+    无该小节时返回空列表（全文 intake 模式不会产生）。
+    """
+    if not content:
+        return []
+    marker = "因预算省略"
+    idx = content.find(marker)
+    if idx < 0:
+        return []
+    section = content[idx:]
+    # 截到下一个 ## 小节或结尾
+    next_section = re.search(r"\n#{1,3}\s[^因]", section[1:])
+    if next_section:
+        section = section[: next_section.start() + 1]
+    notes = []
+    for line in section.splitlines():
+        line = line.strip().lstrip("-*•· ").strip()
+        if line and not line.startswith("#") and not line.startswith("因预算") and len(line) > 4:
+            notes.append(line[:200])
+    return notes[:8]
 
 MODERATOR_PER_AGENT_BUDGET = 2800
 

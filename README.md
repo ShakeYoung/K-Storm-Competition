@@ -98,6 +98,23 @@ K-Storm 根据模板信息密度自动判断当前所处的科研周期阶段，
 - 🔢 **卡片字数角标** — 每个 debate Agent 卡片右上角显示实时字符数角标，无需展开即可感知输出长度
 - 🔎 **讨论内关键词搜索** — 搜索框与轮次标签同行；按关键词过滤 Agent 卡片，同时在卡片内高亮所有匹配文字（黄色标注）；显示匹配数量，一键清除
 - 🏁 **参赛演示模式** — 内置 3 个高质量科研训练案例，覆盖组会预演、结果诊断和本科科研选题，一键填入模板并命名 Run
+- 🛡️ **引用在线核验** — 外部论据页一键对 arXiv/Crossref/OpenReview 在线核验引用真实性，输出「已核验/不一致/未找到/待核验」分级；离线自动降级
+- 💬 **人工介入讨论** — 每轮 Agent 发言后可插入你的意见，下一轮 Agent 自动携带并回应
+- 🎬 **一键演示案例** — 内置预跑完成的完整讨论（含讨论链/IR/批判/报告），断网一键打开，零模型调用
+- 💾 **历史备份与迁移** — 全部历史 run 一键导出为 JSON，支持换机导入恢复
+
+## 🆚 K-Storm vs 直接问 LLM
+
+| 维度 | 直接问 ChatGPT/DeepSeek | K-Storm 多 Agent 讨论 |
+|:--|:--|:--|
+| **视角** | 单一模型，单次回答 | 4 个角色分工（创新/机制/可行性/审稿）+ Moderator 冲突汇总 + Critique 独立审查 |
+| **可复盘** | 一段话，难追溯 | 结构化 IR：候选方向绑定证据引用 + 批判点 + 排序理由 |
+| **证据** | 引用不可控 | Agent 被要求引用论文/数据集；在线核验标注真实性 |
+| **冲突处理** | 模型自圆其说 | Moderator 显式汇总冲突点、遗漏点，生成下一轮问题清单 |
+| **产物** | 一段 Markdown | 报告 + IR + 讨论链 + 引用清单 + 批判报告，可导出 MD/PDF/ZIP |
+| **可对比** | 无法复现 | 历史记录可检索，TF-IDF 跨 Run 记忆检索，量化耗时与调用次数 |
+
+> 典型一次完整讨论：**10 个 Agent · 3 轮 · 约 15-20 次 LLM 调用 · 产出可复盘的结构化决策链**。
 
 ## 🏗️ 系统架构
 
@@ -241,6 +258,8 @@ npm run build                     # 前端生产构建验证
 
 API Key 仅保存在浏览器 `localStorage` 中，不会写入磁盘或 SQLite。
 
+> ⚠️ **安全说明**：K-Storm 设计为**本机单用户**使用，无认证机制。请勿用 `--host 0.0.0.0` 暴露到公网或不受信任的网络。API Key、历史数据与运行记录均存本地，`/api/models/discover` 已限制只接受 http(s) URL（防 SSRF）。历史数据可一键导出/导入备份。
+
 ### 中国科大 107 平台与参赛说明
 
 - 平台适配：见 [docs/USTC-107-PLATFORM-GUIDE.zh-CN.md](docs/USTC-107-PLATFORM-GUIDE.zh-CN.md)
@@ -288,12 +307,16 @@ POST   /api/runs/{run_id}/rerun           从头重跑
 POST   /api/runs/{run_id}/resume          从失败位置继续
 POST   /api/runs/{run_id}/cancel          停止运行
 POST   /api/runs/{run_id}/references      提取或更新外部论据
+POST   /api/runs/{run_id}/references/verify  在线核验引用真实性（arXiv/Crossref/OpenReview）
+POST   /api/runs/{run_id}/interject       人工介入：追加用户意见到指定轮次
 POST   /api/runs/{run_id}/upgrade         升级为更完整模式，自动携带上下文
 POST   /api/memory/query                  记忆查询（基于已完成 Run）
-POST   /api/memory/search                 TF-IDF 跨 Run 知识检索
+POST   /api/memory/search                 TF-IDF 跨 Run 知识检索（含 LLM 查询扩展）
 GET    /api/history                       历史记录列表
+GET    /api/history/export                导出全部历史 run 为 JSON（备份）
+POST   /api/history/import                从 JSON 导入历史 run（迁移恢复）
 POST   /api/history/delete                删除历史记录
-POST   /api/models/discover               从供应商发现可用模型
+POST   /api/models/discover               从供应商发现可用模型（仅 http(s)）
 POST   /api/documents/extract             从 PDF/DOCX/TXT 提取文本
 ```
 

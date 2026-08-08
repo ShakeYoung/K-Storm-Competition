@@ -55,6 +55,7 @@ class StructuredBrief(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     opportunity_points: list[str] = Field(default_factory=list)
     intake_synthesis: str = ""
+    omitted_notes: list[str] = Field(default_factory=list)  # 大文档因预算省略的关键点（供用户人工确认）
 
 
 class TimelineStep(BaseModel):
@@ -77,6 +78,7 @@ class DebateMessage(BaseModel):
     ir_summary: str = ""
     claims: list[str] = Field(default_factory=list)
     concerns: list[str] = Field(default_factory=list)
+    is_human: bool = False  # 用户人工介入意见（非 LLM 生成）
 
 
 class EvidenceRef(BaseModel):
@@ -107,6 +109,7 @@ class ExternalReference(BaseModel):
     cited_viewpoint: str = ""  # 引用该论据支撑的观点
     citing_agent: str = ""  # 引用该论据的 Agent
     round: int = 0
+    verification: dict | None = None  # 在线核验结果（ReferenceVerification 序列化），旧记录缺省为 None
 
 
 class CandidateDirection(BaseModel):
@@ -195,6 +198,11 @@ class RunResumeRequest(BaseModel):
     model_settings: AgentModelSettings | None = None
 
 
+class InterjectRequest(BaseModel):
+    round: int = Field(..., ge=1, le=10)
+    content: str = Field(..., min_length=1)
+
+
 class RunRecord(BaseModel):
     run_id: str
     status: RunStatus
@@ -238,6 +246,8 @@ class HistoryItem(BaseModel):
     target_output: str
     decision_summary: str = ""
     candidate_titles: list[str] = Field(default_factory=list)
+    duration_seconds: int = 0   # 耗时（created_at→updated_at 差，秒）
+    llm_calls: int = 0          # LLM 调用次数估算
     created_at: str
     updated_at: str
 
@@ -288,6 +298,7 @@ class MemorySearchResponse(BaseModel):
     hits: list[MemorySearchHit]
     total_entries_indexed: int
     total_runs_searched: int
+    expanded_queries: list[str] = Field(default_factory=list)  # LLM 扩展的同义检索词（空=未扩展）
 
 
 JsonDict = dict[str, Any]

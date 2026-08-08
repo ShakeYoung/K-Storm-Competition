@@ -432,18 +432,22 @@ K-Storm/
 ### V2.0 / 参赛版已补充
 
 - Critique Agent 独立阶段：讨论结束后进行六维风险审查。
-- Citation Review Agent：对外部引用进行线索一致性、完整性和支撑关系审查（基于讨论文本，不接外部文献数据库）。
-- TF-IDF 跨 Run 记忆检索：从 StructuredIRV2 和 StructuredBrief 中提取候选方向、关键主张、批判点和机会点。
+- Citation Review Agent：对外部引用进行线索一致性、完整性和支撑关系审查；支持注入在线核验结果。
+- **引用在线核验**：`app/verification/` 模块对 arXiv / Crossref / OpenReview 在线核验引用真实性，输出 verified/mismatch/not_found/pending 分级；离线自动降级为 pending。
+- **人工介入讨论**：`POST /api/runs/{id}/interject` 在指定轮次追加用户意见（`DebateMessage.is_human`），runner 每轮 DB 重拉使下一轮 Agent 自动携带。
+- **演示案例包**：真实 run 导出为 `app/seed/demo_*.json`，startup 自动注入，前端「⚡ 一键演示」断网打开完整讨论链。
+- TF-IDF 跨 Run 记忆检索：从 StructuredIRV2 和 StructuredBrief 中提取候选方向、关键主张、批判点和机会点；含 LLM 查询扩展（规则降级兜底）。
+- **大文档信息保全**：intake 摘要模式输出「因预算省略的关键点」清单（`StructuredBrief.omitted_notes`），前端告警提示。
 - 模式升级链路：Quick Probe → Focused Panel → Full Deliberation，并自动携带前序上下文。
 - SSE 实时推送：状态流和 token 流双通道，连接断开自动结束（无固定超时）。
 - 参赛演示模式：内置高质量科研训练案例，一键填入模板。
-- 稳定性收口：启动时回收服务重启遗留的进行中 run（可一键恢复）；resume 按讨论模式路由（聚焦/快速/记忆不退化）；34 个 pytest 测试全绿。
+- 稳定性收口：启动时回收服务重启遗留的进行中 run（可一键恢复）；resume 按讨论模式路由（聚焦/快速/记忆不退化）；61 个 pytest + 16 个前端 vitest 全绿。
 - USTC 107 平台预置：10 个模型 preset，前端「⚡ 一键配置」读取全部模型并生成推荐分配。
+- **历史备份与迁移**：`/api/history/export` + `/api/history/import`；`/api/models/discover` 限制 http(s) scheme 防 SSRF。
 
 ### 后续优化方向
 
 - 桌面封装（Electron + PyInstaller）：为后续阶段，剥离后已从本仓库移除，重新封装时复用 `assets/` 下的图标与 `docs/VERSIONING.zh-CN.md` 的版本规则。
 - 本地文档 chunk 级检索与更细粒度证据绑定（路线图 V2 核心）。
-- 引用真实性在线核验（Crossref / OpenAlex / arXiv，可选开关）。
-- 人工介入讨论（human-in-the-loop）与多 Run 对比视图。
+- 多 Run 对比视图（同模板 × 不同模型/轮次结果并排对比）。
 - 将平台适配截图纳入 `docs/screenshots/`，用于比赛提交材料。

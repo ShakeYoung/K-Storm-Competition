@@ -3,7 +3,7 @@ import { DEBATE_AGENTS } from "../lib/constants.js";
 
 function ModeSelector({ mode, onChange, researchStage, setResearchStage, selectedAgents, setSelectedAgents, probeAgent, setProbeAgent, probeQuestion, setProbeQuestion, rounds, setRounds, parallelFirstRound, setParallelFirstRound }) {
   const modes = [
-    { key: "full", label: "完整讨论", desc: "多轮全员辩论 + IR 总结", agents: 8, rounds: "2-5" },
+    { key: "full", label: "完整讨论", desc: "多轮全员辩论 + IR 总结", agents: "4 讨论 + 6 编排", rounds: "2-5" },
     { key: "focused", label: "聚焦小节", desc: "仅关键 Agent 精准讨论", agents: "2-3", rounds: "1-2" },
     { key: "quick", label: "快速探测", desc: "单 Agent 单次问答", agents: 1, rounds: "1" },
     { key: "memory", label: "记忆查询", desc: "检索历史 Run 的洞察", agents: 0, rounds: "0" },

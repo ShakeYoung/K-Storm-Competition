@@ -222,7 +222,9 @@ def list_history(limit: int = 30) -> list[HistoryItem]:
     with connect() as db:
         rows = db.execute(
             """
-            SELECT run_id, status, mode, research_stage, source_run_id, run_name, template_input, structured_ir, created_at, updated_at
+            SELECT run_id, status, mode, research_stage, source_run_id, run_name,
+                   template_input, structured_ir, debate_messages, timeline,
+                   created_at, updated_at
             FROM runs
             ORDER BY updated_at DESC
             LIMIT ?
@@ -238,6 +240,9 @@ def list_history(limit: int = 30) -> list[HistoryItem]:
                 structured_ir = StructuredIRV2.model_validate_json(row["structured_ir"])
             except Exception:
                 structured_ir = None
+        # 耗时与调用次数估算
+        duration_seconds = _estimate_duration(row["created_at"], row["updated_at"])
+        llm_calls = _estimate_llm_calls(row["debate_messages"], row["timeline"], row["mode"] if "mode" in row.keys() else "full")
         items.append(
             HistoryItem(
                 run_id=row["run_id"],
@@ -253,11 +258,40 @@ def list_history(limit: int = 30) -> list[HistoryItem]:
                     candidate.title
                     for candidate in (structured_ir.candidate_directions if structured_ir else [])[:3]
                 ],
+                duration_seconds=duration_seconds,
+                llm_calls=llm_calls,
                 created_at=row["created_at"],
                 updated_at=row["updated_at"],
             )
         )
     return items
+
+
+def _estimate_duration(created_at: str, updated_at: str) -> int:
+    """从 created_at → updated_at 计算耗时秒数。失败返回 0。"""
+    try:
+        from datetime import datetime
+        start = datetime.fromisoformat(created_at)
+        end = datetime.fromisoformat(updated_at)
+        return max(0, int((end - start).total_seconds()))
+    except Exception:
+        return 0
+
+
+def _estimate_llm_calls(debate_messages_raw: str, timeline_raw: str, mode: str) -> int:
+    """估算 LLM 调用次数：debate 消息数 + 固定阶段（intake/moderator/critique/citation/summary/report）。
+    quick 模式只有 1 次；focused 跳过 moderator。"""
+    try:
+        import json as _json
+        msgs = _json.loads(debate_messages_raw or "[]")
+        msg_count = len(msgs)
+    except Exception:
+        msg_count = 0
+    if mode == "quick":
+        return max(1, msg_count)
+    # full 模式：messages + intake(1) + moderator(1,full) + critique(1) + citation(1) + summary(1) + report(1)
+    fixed = 6 if mode == "full" else 4  # focused: intake + summary + report + (critique/citation 可选)
+    return msg_count + fixed
 
 
 def delete_runs(run_ids: list[str]) -> int:
@@ -321,6 +355,92 @@ def history_location() -> dict[str, str]:
         "folder": str(DB_PATH.parent),
         "database": str(DB_PATH),
     }
+
+
+# ── 演示案例 seed 注入 ──────────────────────────────────────────────────────
+# 全新空库启动时自动灌入预置的完整演示 run（含讨论链/IR/批判/引用/报告），
+# 让参赛演示断网可用：一键打开历史 run 直接展示，全程零 LLM 调用。
+
+SEED_DIR = Path(__file__).resolve().parents[1] / "seed"
+
+
+def seed_demo_runs() -> int:
+    """把 app/seed/demo_*.json 灌入当前数据库（若 run_id 已存在则跳过）。
+
+    返回新注入的演示 run 数量。幂等：已有 run 不会被覆盖。
+    """
+    if not SEED_DIR.exists():
+        return 0
+    seed_files = sorted(SEED_DIR.glob("demo_*.json"))
+    if not seed_files:
+        return 0
+
+    from app.schemas.models import (
+        AgentModelSettings,
+        DiscussionMode,
+        ExternalReference,
+        ResearchStage,
+        RunRecord,
+        RunStatus,
+        StructuredBrief,
+        StructuredIRV2,
+        TemplateInput,
+        TimelineStep,
+        UploadedDocument,
+    )
+
+    injected = 0
+    for seed_file in seed_files:
+        try:
+            data = json.loads(seed_file.read_text(encoding="utf-8"))
+            run_id = data.get("run_id") or seed_file.stem
+            try:
+                get_run(run_id)
+                continue  # 已存在则跳过
+            except KeyError:
+                pass
+
+            template = TemplateInput.model_validate(data["template_input"])
+            create_run(
+                run_id,
+                template,
+                documents=[UploadedDocument.model_validate(d) for d in data.get("documents", [])],
+                model_settings=AgentModelSettings.model_validate(data.get("model_settings") or {}),
+                rounds=data.get("rounds", 3),
+                parallel_first_round=bool(data.get("parallel_first_round", False)),
+                mode=data.get("mode", DiscussionMode.FULL_DELIBERATION.value),
+                research_stage=data.get("research_stage", ResearchStage.AUTO.value),
+                selected_agents=data.get("selected_agents", []),
+                probe_agent=data.get("probe_agent", ""),
+                probe_question=data.get("probe_question", ""),
+                source_run_id=data.get("source_run_id", ""),
+                upgrade_from_run_id=data.get("upgrade_from_run_id", ""),
+                run_name=data.get("run_name", ""),
+            )
+
+            update_kwargs: dict = {
+                "status": RunStatus.COMPLETED,
+                "current_step": "分析完成",
+                "final_report": data.get("final_report", ""),
+                "group_summary": data.get("group_summary", ""),
+                "critique_report": data.get("critique_report", ""),
+                "citation_review": data.get("citation_review", ""),
+                "ir_warnings": data.get("ir_warnings", []),
+                "external_references": [
+                    ExternalReference.model_validate(r) for r in data.get("external_references", [])
+                ],
+                "debate_messages": data["debate_messages"],  # create_run 写空列表，这里覆盖
+            }
+            if data.get("structured_brief"):
+                update_kwargs["structured_brief"] = StructuredBrief.model_validate(data["structured_brief"])
+            if data.get("structured_ir"):
+                update_kwargs["structured_ir"] = StructuredIRV2.model_validate(data["structured_ir"])
+            update_run(run_id, **update_kwargs)
+            injected += 1
+        except Exception:
+            # 单个 seed 文件失败不影响其他与主流程
+            continue
+    return injected
 
 
 def row_to_run(row: sqlite3.Row) -> RunRecord:

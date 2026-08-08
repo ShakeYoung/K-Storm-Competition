@@ -51,6 +51,7 @@ from app.orchestrator.prompts import (
     debate_prompt,
     document_budget_warnings,
     document_extract_prompt,
+    extract_omitted_notes,
     intake_prompt,
     moderator_prompt,
     needs_hybrid_intake,
@@ -553,6 +554,7 @@ def execute_focused_panel(
     )
     ensure_not_canceled(run.run_id)
     structured_brief.intake_synthesis = intake_note
+    structured_brief.omitted_notes = extract_omitted_notes(intake_note)
     # 注入记忆上下文(如果有源 run)
     inject_memory_context(run, structured_brief)
     inject_upgrade_context(run, structured_brief)
@@ -1176,6 +1178,7 @@ def execute_run(
     )
     ensure_not_canceled(run.run_id)
     structured_brief.intake_synthesis = intake_note
+    structured_brief.omitted_notes = extract_omitted_notes(intake_note)
     inject_upgrade_context(run, structured_brief)
     structured_brief.opportunity_points.append("入口 Agent 已整合模板和上传文档,讨论组以入口整合 briefing 为准。")
     timeline = finish_timeline_step(timeline, "intake")
@@ -1294,6 +1297,7 @@ def run_intake_step(
     )
     ensure_not_canceled(run.run_id)
     structured_brief.intake_synthesis = intake_note
+    structured_brief.omitted_notes = extract_omitted_notes(intake_note)
     structured_brief.opportunity_points.append("入口 Agent 已整合模板和上传文档,讨论组以入口整合 briefing 为准。")
     timeline = finish_timeline_step(timeline, "intake")
     run = update_run_checked(run.run_id, structured_brief=structured_brief, timeline=timeline)
@@ -1595,6 +1599,13 @@ def run_debate_round_serial(
     timeline: list[TimelineStep],
     round_number: int,
 ) -> tuple[list[DebateMessage], list[TimelineStep], RunRecord]:
+    # 每轮开始重拉 DB，让运行中 run 能看到用户通过 /interject 插入的人工意见
+    try:
+        latest = db.get_run(run.run_id)
+        if latest.debate_messages and len(latest.debate_messages) > len(messages):
+            messages = list(latest.debate_messages)
+    except Exception:
+        pass
     for agent in DISCUSSION_AGENTS:
         ensure_not_canceled(run.run_id)
         current_step = f"{agent.display_name} 发言(第 {round_number} 轮)"
@@ -1823,7 +1834,9 @@ def timeline_step_status(timeline: list[TimelineStep], key: str) -> str:
 
 def has_agent_message(messages: list[DebateMessage], round_number: int, agent: AgentSpec) -> bool:
     return any(
-        message.round == round_number and message.agent == agent.display_name
+        not message.is_human
+        and message.round == round_number
+        and message.agent == agent.display_name
         for message in messages
     )
 

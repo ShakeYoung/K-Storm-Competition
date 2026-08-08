@@ -70,8 +70,8 @@ class MockModelProvider(ModelProvider):
                 '- 风险或反驳点：创新边界不够清楚\n'
                 '- 建议进入 IR 的下一步动作：明确差异化切入点\n\n'
                 '### 外部引用\n'
-                f'[paper] {field}领域近五年创新方向综述 | Zhang et al. | https://example.com/review-{field[:3]} | 2024 | 创新方向选择有文献基础\n'
-                f'[blog] {platforms}实验平台最佳实践 | Lab Protocols | https://example.com/protocols | 2023 | 平台可行性有实践指南'
+                f'[paper] {field}领域近五年创新方向综述 | Zhang et al. | https://doi.org/10.1038/s41586-021-03819-2 | 2024 | 创新方向选择有文献基础（示例引用，请通过在线核验或人工确认替换）\n'
+                f'[blog] 实验平台最佳实践与可复现性指南 | Protocol Exchange | https://www.protocols.io/ | 2023 | 平台可行性有实践指南（示例引用）'
                 + '\n<<<END_OF_AGENT_MESSAGE>>>'
             )
         if agent_key == "mechanism":
@@ -89,7 +89,7 @@ class MockModelProvider(ModelProvider):
                 '- 风险或反驳点：通路过多需收敛\n'
                 '- 建议进入 IR 的下一步动作：确定主链条和备选链条\n\n'
                 '### 外部引用\n'
-                f'[paper] Causal inference in {field}: a systematic review | Li et al. | https://example.com/causal-{field[:3]} | 2023 | 因果验证方案有系统综述支撑'
+                f'[paper] Causal inference in {field}: a systematic review | Li et al. | https://arxiv.org/abs/1905.12566 | 2023 | 因果验证方案有系统综述支撑（示例引用）'
                 + '\n<<<END_OF_AGENT_MESSAGE>>>'
             )
         if agent_key == "feasibility":
@@ -107,8 +107,8 @@ class MockModelProvider(ModelProvider):
                 '- 风险或反驳点：周期可能超预期\n'
                 '- 建议进入 IR 的下一步动作：定义 2-4 周验证计划\n\n'
                 '### 外部引用\n'
-                f'[paper] Rapid validation strategies in experimental {field} | Wang et al. | https://example.com/rapid-validation | 2024 | 快速验证策略有方法论文\n'
-                f'[dataset] {platforms}公共数据集 | Open Data Portal | https://example.com/dataset-{field[:3]} | 2023 | 公共数据可直接获取'
+                f'[paper] Rapid validation strategies in experimental {field} | Wang et al. | https://arxiv.org/abs/1605.08386 | 2024 | 快速验证策略有方法论文（示例引用）\n'
+                f'[dataset] {platforms}公共数据集 | Open Data Portal | https://portal.gdc.cancer.gov/ | 2023 | 公共数据可直接获取（示例引用）'
                 + '\n<<<END_OF_AGENT_MESSAGE>>>'
             )
         if agent_key == "reviewer":
@@ -126,8 +126,8 @@ class MockModelProvider(ModelProvider):
                 '- 风险或反驳点：目标产出需定义最低可讨论单元\n'
                 '- 建议进入 IR 的下一步动作：对 Top 方向综合打分\n\n'
                 '### 外部引用\n'
-                f'[paper] Common pitfalls in {field} research proposals | Chen et al. | https://example.com/pitfalls-{field[:3]} | 2022 | 评审常见质疑点有文献归纳\n'
-                f'[blog] How to write a strong {target} | Academic Writing Blog | https://example.com/writing-guide | 2024 | 论证写作有结构化指南'
+                f'[paper] Common pitfalls in {field} research proposals | Chen et al. | https://arxiv.org/abs/2106.06669 | 2022 | 评审常见质疑点有文献归纳（示例引用）\n'
+                f'[blog] How to write a strong research proposal | NIH Grants Guide | https://grants.nih.gov/grants/how-to-apply-application-guide/format-and-write/write-your-application.htm | 2024 | 论证写作有结构化指南（示例引用）'
                 + '\n<<<END_OF_AGENT_MESSAGE>>>'
             )
         if agent_key == "moderator":
