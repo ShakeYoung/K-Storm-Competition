@@ -441,6 +441,7 @@ def create_run_record(payload: RunCreate) -> RunRecord:
         probe_agent=payload.probe_agent,
         probe_question=payload.probe_question,
         source_run_id=payload.source_run_id,
+        upgrade_from_run_id=payload.upgrade_from_run_id,
         run_name=payload.run_name,
     )
 
@@ -1843,7 +1844,7 @@ def build_structured_brief(
     ]
     constraints = [
         item.strip()
-        for item in template.constraints.replace(";", ";").split(";")
+        for item in re.split(r"[;；、\n]", template.constraints)
         if item.strip()
     ] or ["用户暂未提供明确资源限制,讨论中需要主动提示周期、经费、样本和平台风险。"]
     opportunity_points = [
@@ -2397,7 +2398,9 @@ def citation_review_prompt(
                     ref_lines.append(f"[{msg.agent} R{msg.round}] {line}")
     refs_text = "\n".join(ref_lines) if ref_lines else "（讨论中未发现结构化引用行，请基于发言正文分析引用情况）"
     return f"""
-你是引用真实性审查 Agent。请对以下讨论中各 Agent 引用的外部文献进行语义真实性交叉验证。
+你是引用线索审查 Agent。请对以下讨论中各 Agent 引用的外部文献进行线索一致性、完整性和相关性的检查。
+
+重要边界：你只能基于讨论文本本身做线索层面的交叉检查，不能访问外部文献数据库（如 Crossref、OpenAlex、Semantic Scholar）。因此你的检查不能替代对文献真实存在性的核实——对于无法在讨论文本中交叉印证的引用，应标注「需人工核实」，而不是断言其真实或虚假。
 
 研究领域：{template.field}
 
@@ -2407,7 +2410,7 @@ def citation_review_prompt(
 讨论摘要（仅供上下文，不要逐字引用）：
 {discussion_digest(messages)}
 
-请按以下四个维度进行审查，并对每条引用给出「可信度评分（高/中/低/存疑）」：
+请按以下四个维度进行审查，并对每条引用给出「线索可信度评分（高/中/低/存疑）」：
 
 ## 1. 引用相关性
 （逐条检查引用与论点的相关性，标出偏题引用）
@@ -2421,12 +2424,12 @@ def citation_review_prompt(
 ## 4. 引用密度
 （评估整体引用密度，列出缺乏文献支撑的关键论断）
 
-## 各引用可信度评分
-（逐条评分，格式：[引用条目] → 评分：高/中/低/存疑 | 理由）
+## 各引用线索可信度评分
+（逐条评分，格式：[引用条目] → 线索评分：高/中/低/存疑 | 理由；存疑用于无法在文本内交叉印证、需外部数据库核实的条目）
 
-## 整体引用质量评级
-整体引用质量：[A/B/C/D]（A=优秀，B=良好，C=需改进，D=不足）
-需要补充文献的关键论断清单：
+## 整体引用线索质量评级
+整体引用线索质量：[A/B/C/D]（A=优秀，B=良好，C=需改进，D=不足）
+需要补充文献或人工核实的关键论断清单：
 1.
 2.
 3.

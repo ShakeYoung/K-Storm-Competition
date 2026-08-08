@@ -101,6 +101,8 @@ def init_db() -> None:
             db.execute("ALTER TABLE runs ADD COLUMN probe_question TEXT NOT NULL DEFAULT ''")
         if "source_run_id" not in columns:
             db.execute("ALTER TABLE runs ADD COLUMN source_run_id TEXT NOT NULL DEFAULT ''")
+        if "upgrade_from_run_id" not in columns:
+            db.execute("ALTER TABLE runs ADD COLUMN upgrade_from_run_id TEXT NOT NULL DEFAULT ''")
         if "ir_warnings" not in columns:
             db.execute("ALTER TABLE runs ADD COLUMN ir_warnings TEXT NOT NULL DEFAULT '[]'")
         if "external_references" not in columns:
@@ -126,6 +128,7 @@ def create_run(
     probe_agent: str = "",
     probe_question: str = "",
     source_run_id: str = "",
+    upgrade_from_run_id: str = "",
     run_name: str = "",
 ) -> RunRecord:
     now = utc_now()
@@ -141,9 +144,9 @@ def create_run(
             INSERT INTO runs (
                 run_id, status, mode, research_stage, template_input, rounds, parallel_first_round,
                 model_settings, documents, selected_agents, probe_agent, probe_question,
-                source_run_id, run_name, debate_messages, created_at, updated_at
+                source_run_id, upgrade_from_run_id, run_name, debate_messages, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 run_id,
@@ -159,6 +162,7 @@ def create_run(
                 probe_agent,
                 probe_question,
                 source_run_id,
+                upgrade_from_run_id,
                 run_name,
                 "[]",
                 now,
@@ -303,6 +307,7 @@ def row_to_run(row: sqlite3.Row) -> RunRecord:
         probe_agent=row["probe_agent"] if "probe_agent" in row.keys() else "",
         probe_question=row["probe_question"] if "probe_question" in row.keys() else "",
         source_run_id=row["source_run_id"] if "source_run_id" in row.keys() else "",
+        upgrade_from_run_id=row["upgrade_from_run_id"] if "upgrade_from_run_id" in row.keys() else "",
         model_settings=AgentModelSettings.model_validate_json(row["model_settings"] or "{}"),
         structured_brief=(
             StructuredBrief.model_validate_json(structured_raw)

@@ -162,6 +162,27 @@ const COMPETITION_DEMOS = [
 
 const requiredFields = ["field", "background", "existing_basis"];
 
+// 后端所有“运行中”状态（含各阶段细分），打开这类 run 时需恢复轮询/SSE
+const ACTIVE_RUN_STATES = [
+  "CREATED",
+  "TEMPLATE_VALIDATED",
+  "INTAKE_RUNNING",
+  "DEBATE_RUNNING",
+  "CRITIQUE_RUNNING",
+  "GROUP_SUMMARY_RUNNING",
+  "CITATION_REVIEW_RUNNING",
+  "FINAL_REPORT_RUNNING",
+];
+
+// 统一把后端状态映射为 status-badge CSS 类（运行中细分状态归一为 running）
+function statusBadgeClass(status) {
+  if (status === "COMPLETED") return "completed";
+  if (status === "FAILED") return "failed";
+  if (status === "CANCELED") return "pending";
+  if (ACTIVE_RUN_STATES.includes(status)) return "running";
+  return "pending";
+}
+
 const formFields = [
   ["field", "研究领域", "如：肿瘤免疫、单细胞测序、材料催化"],
   ["background", "实验大背景", "当前领域问题、疾病背景、技术背景"],
@@ -182,6 +203,8 @@ const agentSlots = [
   ["feasibility", "可行性 Agent", "讨论组"],
   ["reviewer", "审稿人 Agent", "讨论组"],
   ["moderator", "Moderator", "冲突与遗漏"],
+  ["critique", "Critique Agent", "独立批判"],
+  ["citation_review", "Citation Review", "引用审查"],
   ["group_summarizer", "结构化 IR", "总结"],
   ["output", "出口 Agent", "最终报告"],
 ];
@@ -193,6 +216,8 @@ const agentRecommendations = {
   feasibility: "推荐：成本适中且执行细节可靠的模型，例如 科大107平台 DeepSeek-V3，用于压实实验路线。",
   reviewer: "推荐：批判性和长文本能力强的模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于模拟审稿质疑。",
   moderator: "推荐：总结和对比能力强的中高质量模型，例如 科大107平台 GLM5.2，用于提炼第 1 轮冲突点和第 2 轮问题清单。",
+  critique: "推荐：推理能力强的中等强度模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于六维独立批判审查。",
+  citation_review: "推荐：响应较快、结构化能力可靠的模型，例如 科大107平台 DeepSeek-V4-Flash / Qwen3.6-Chat，用于引用线索一致性检查。",
   group_summarizer: "推荐：结构化能力强的模型，例如 科大107平台 DeepSeek-V4，用于把多轮讨论压缩成稳定 IR。",
   output: "推荐：质量最高、中文写作稳定的模型，例如 科大107平台 GLM5.2 / DeepSeek-V4，用于生成最终 Markdown 报告。",
 };
@@ -725,15 +750,31 @@ function App() {
         const resp = await fetch(`${API_BASE}/api/documents/extract`, { method: "POST", body: form });
         if (!resp.ok) throw new Error(`提取失败 ${resp.status}`);
         const { results } = await resp.json();
+        const failedNames = [];
         for (const r of results) {
-          nextDocuments.push({
-            id: `doc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-            name: r.name,
-            doc_type: inferDocumentType(r.name),
-            content: r.error ? `[提取失败: ${r.error}]` : r.text,
-            note: "",
-            summary: r.error ? r.error : "",
-          });
+          if (r.error) {
+            failedNames.push(r.name);
+            nextDocuments.push({
+              id: `doc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              name: r.name,
+              doc_type: inferDocumentType(r.name),
+              content: "",
+              note: "",
+              summary: `⚠️ 提取失败：${r.error}`,
+            });
+          } else {
+            nextDocuments.push({
+              id: `doc-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+              name: r.name,
+              doc_type: inferDocumentType(r.name),
+              content: r.text,
+              note: "",
+              summary: "",
+            });
+          }
+        }
+        if (failedNames.length) {
+          setError(`${failedNames.length} 个文件提取失败：${failedNames.join("、")}。可在文件卡片中查看原因，或检查后端依赖。`);
         }
       } catch (err) {
         setError(`文档提取出错：${err.message}`);
@@ -972,8 +1013,7 @@ function App() {
       setRounds(inferRunRounds(data));
       setActiveRounds(inferRunRounds(data));
       // 如果 run 仍在运行，启动 polling 并保持 loading
-      const runningStates = ["RUNNING", "INTAKE_RUNNING", "DEBATE_RUNNING", "GROUP_SUMMARY_RUNNING", "FINAL_REPORT_RUNNING"];
-      if (runningStates.includes(data.status)) {
+      if (ACTIVE_RUN_STATES.includes(data.status)) {
         startPolling(data.run_id);
         return data;
       }
@@ -983,8 +1023,7 @@ function App() {
       return null;
     } finally {
       // 只有非运行状态才结束 loading
-      const runningStates = ["RUNNING", "INTAKE_RUNNING", "DEBATE_RUNNING", "GROUP_SUMMARY_RUNNING", "FINAL_REPORT_RUNNING"];
-      if (!loadedData || !runningStates.includes(loadedData.status)) {
+      if (!loadedData || !ACTIVE_RUN_STATES.includes(loadedData.status)) {
         setLoading(false);
       }
     }
@@ -2240,6 +2279,8 @@ function OverviewPage({ run, history, loading, onPageNavigate, onOpenRun }) {
         </div>
       </div>
 
+      <DeliverablesStrip run={run} />
+
       <div className="panel">
         <div className="panel-title">
           <div>
@@ -2294,6 +2335,28 @@ function OverviewPage({ run, history, loading, onPageNavigate, onOpenRun }) {
         )}
       </div>
     </div>
+  );
+}
+
+function DeliverablesStrip({ run }) {
+  const debateCount = run?.debate_messages?.length ?? 0;
+  const documentCount = run?.documents?.length ?? 0;
+  const deliverables = [
+    ["deliverable_01", "结构化 Briefing", run?.structured_brief ? "ready" : "pending"],
+    ["deliverable_02", "多 Agent 讨论链", debateCount ? `${debateCount} msgs` : "pending"],
+    ["deliverable_03", "组会提纲 / 风险批判", run?.group_summary ? "generated" : "queued"],
+    ["deliverable_04", documentCount ? `证据文件 ${documentCount}` : "报告导出包", run?.final_report ? "ready" : "queued"],
+  ];
+  return (
+    <section className="deliverables-strip" aria-label="K-Storm 输出物状态">
+      {deliverables.map(([key, title, state]) => (
+        <div className="deliverable-card" key={key}>
+          <small>{key}</small>
+          <strong>{title}</strong>
+          <em>{state}</em>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -2406,12 +2469,12 @@ function IntelRail({ run, loading, modelSettings, activePage, onNavigate, onCopy
             <div className="intel-row">
               <span>状态</span>
               <strong>
-                <span className={`status-badge ${run.status === "COMPLETED" ? "completed" : run.status === "FAILED" ? "failed" : run.status === "RUNNING" ? "running" : "pending"}`}>
+                <span className={`status-badge ${statusBadgeClass(run.status)}`}>
                   {loading ? "RUNNING" : run.status}
                 </span>
               </strong>
             </div>
-            {run.field ? <div className="intel-row"><span>领域</span><strong style={{fontSize:12}}>{run.field.length > 20 ? run.field.slice(0,20) + "..." : run.field}</strong></div> : null}
+            {run?.template_input?.field ? <div className="intel-row"><span>领域</span><strong style={{fontSize:12}}>{run.template_input.field.length > 20 ? run.template_input.field.slice(0,20) + "..." : run.template_input.field}</strong></div> : null}
             {run.research_stage ? <div className="intel-row"><span>阶段</span><strong>{{auto: "自动", topic_exploration: "选题探索", plan_refinement: "方案收敛", result_diagnosis: "结果诊断", pivot_evaluation: "转向评估"}[run.research_stage] || run.research_stage}</strong></div> : null}
           </div>
         ) : (
@@ -2547,6 +2610,8 @@ function RunOverview({ run, loading, activeRounds, onRerun, onCancel, onConfirmR
         <Metric label="Agent 发言" value={run ? run.debate_messages.length : "-"} />
         <Metric label="状态" value={loading ? "RUNNING" : run?.status ?? "READY"} />
       </div>
+
+      <DeliverablesStrip run={run} />
 
       <ProgressTimeline run={run} activeRounds={activeRounds} />
 
@@ -3301,7 +3366,7 @@ function DebateView({ run, streamingPartial }) {
             display: "flex", alignItems: "center", gap: 8, marginBottom: 10,
             borderBottom: "2px solid var(--violet, #6B4FB8)", paddingBottom: 6,
           }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--violet, #6B4FB8)" }}>📚 Citation Review Agent · 引用真实性审查</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: "var(--violet, #6B4FB8)" }}>📚 Citation Review Agent · 引用线索审查</span>
             {run?.status === "CITATION_REVIEW_RUNNING" && !run?.citation_review && (
               <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 700 }}>● 生成中</span>
             )}
@@ -4231,7 +4296,7 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
             >
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.4, marginBottom: 4 }}>{item.run_name || item.field}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 4, flexWrap: "wrap" }}>
-                <span className={`status-badge ${item.status === "COMPLETED" ? "completed" : item.status === "FAILED" ? "failed" : item.status === "RUNNING" ? "running" : "pending"}`} style={{ fontSize: 10 }}>
+                <span className={`status-badge ${statusBadgeClass(item.status)}`} style={{ fontSize: 10 }}>
                   {item.status}
                 </span>
                 {item.mode && item.mode !== "full" ? (
@@ -4352,7 +4417,13 @@ function HistoryView({
   const filtered = React.useMemo(() => {
     let list = history;
     if (statusFilter !== "all") {
-      list = list.filter((h) => h.status === statusFilter);
+      if (statusFilter === "RUNNING") {
+        // 后端的“运行中”实际是 CREATED/TEMPLATE_VALIDATED/各 *_RUNNING 细分状态，
+        // 这里统一归一为“运行中”筛选。
+        list = list.filter((h) => ACTIVE_RUN_STATES.includes(h.status));
+      } else {
+        list = list.filter((h) => h.status === statusFilter);
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -4432,7 +4503,7 @@ function HistoryView({
                         源 {item.source_run_id.slice(0, 8)}
                       </span>
                     ) : null}
-                    <span className={`status-badge ${item.status === "COMPLETED" ? "completed" : item.status === "FAILED" ? "failed" : item.status === "RUNNING" ? "running" : "pending"}`}>{item.status}</span>
+                    <span className={`status-badge ${statusBadgeClass(item.status)}`}>{item.status}</span>
                     {" \u00b7 "}{new Date(item.created_at).toLocaleString()}
                   </small>
                 </button>

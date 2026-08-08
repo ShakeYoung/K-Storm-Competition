@@ -25,6 +25,17 @@ class MockModelProvider(ModelProvider):
         constraints = _extract(user_prompt, "资源限制") or "周期、样本和经费约束"
         preferred = _extract(user_prompt, "偏好方向") or "机制与应用兼顾"
 
+        # Quick Probe 的 user_prompt 请求 <<<END_OF_QUICK_PROBE>>>，但下方各 Agent
+        # 分支硬编码了 <<<END_OF_AGENT_MESSAGE>>>。这里统一把结尾标记对齐到调用方
+        # 实际请求的那一个，避免 mock 在 quick 模式下输出校验失败。
+        requested_marker = _detect_end_marker(user_prompt)
+        result = self._render(agent_key, field, target, platforms, constraints, preferred, user_prompt)
+        if requested_marker and requested_marker not in result:
+            result = result.replace("<<<END_OF_AGENT_MESSAGE>>>", "").rstrip()
+            result += f"\n{requested_marker}"
+        return result
+
+    def _render(self, agent_key, field, target, platforms, constraints, preferred, user_prompt):
         if agent_key == "intake":
             return (
                 f'## 研究背景压缩\n\n'
@@ -221,6 +232,12 @@ def _extract(text: str, label: str) -> str:
     if not match:
         return ""
     return match.group(1).strip()
+
+
+def _detect_end_marker(user_prompt: str) -> str:
+    """Return the end marker the caller asked for, if any (e.g. <<<END_OF_QUICK_PROBE>>>)."""
+    match = re.search(r"(<<<END_OF_[A-Z_]+>>>)", user_prompt)
+    return match.group(1) if match else ""
 
 
 def _mock_report(

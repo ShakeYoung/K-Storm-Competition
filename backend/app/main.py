@@ -53,6 +53,18 @@ APP_VERSION = resolve_app_version()
 app = FastAPI(title="K-Storm API", version=APP_VERSION)
 
 KNOWN_MODEL_PRESETS = {
+    "ustc-107": [
+        {"id": "deepseek-v4-pro", "name": "deepseek-v4-pro", "model": "deepseek-v4-pro"},
+        {"id": "glm-5.2", "name": "glm-5.2", "model": "glm-5.2"},
+        {"id": "deepseek-v4-flash", "name": "deepseek-v4-flash", "model": "deepseek-v4-flash"},
+        {"id": "deepseek-v4-flash-ascend", "name": "deepseek-v4-flash-ascend", "model": "deepseek-v4-flash-ascend"},
+        {"id": "qwen3.6-reasoner", "name": "qwen3.6-reasoner", "model": "qwen3.6-reasoner"},
+        {"id": "qwen3.6-chat", "name": "qwen3.6-chat", "model": "qwen3.6-chat"},
+        {"id": "qwen-reasoner", "name": "qwen-reasoner", "model": "qwen-reasoner"},
+        {"id": "qwen-chat", "name": "qwen-chat", "model": "qwen-chat"},
+        {"id": "smart/default", "name": "smart/default", "model": "smart/default"},
+        {"id": "smart/reasoning", "name": "smart/reasoning", "model": "smart/reasoning"},
+    ],
     "kimi-coding": [
         {"id": "kimi-for-coding", "name": "kimi-for-coding", "model": "kimi-for-coding"},
     ],
@@ -429,7 +441,10 @@ async def extract_documents(files: list[UploadFile] = File(...)) -> dict:
         error = ""
         try:
             if ext == "pdf":
-                import pdfplumber
+                try:
+                    import pdfplumber
+                except ImportError:
+                    raise RuntimeError("PDF 提取依赖未安装（pdfplumber），请在后端环境执行 pip install -r requirements.txt")
                 with pdfplumber.open(io.BytesIO(data)) as pdf:
                     pages = []
                     for page in pdf.pages:
@@ -438,7 +453,10 @@ async def extract_documents(files: list[UploadFile] = File(...)) -> dict:
                             pages.append(page_text)
                     text = "\n\n".join(pages)
             elif ext in {"docx", "doc"}:
-                from docx import Document as DocxDocument
+                try:
+                    from docx import Document as DocxDocument
+                except ImportError:
+                    raise RuntimeError("Word 文档提取依赖未安装（python-docx），请在后端环境执行 pip install -r requirements.txt")
                 doc = DocxDocument(io.BytesIO(data))
                 paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
                 text = "\n".join(paragraphs)

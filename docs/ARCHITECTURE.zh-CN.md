@@ -409,8 +409,8 @@ K-Storm/
   data/
     ks.sqlite3
 
-  README.md
-  README.zh-CN.md
+  README.md              中文文档（主页默认渲染）
+  README.en.md           英文文档
 ```
 
 ## 9. 项目状态与后续方向
@@ -432,7 +432,7 @@ K-Storm/
 ### V2.0 / 参赛版已补充
 
 - Critique Agent 独立阶段：讨论结束后进行六维风险审查。
-- Citation Review Agent：对外部引用进行语义真实性和支撑关系审查。
+- Citation Review Agent：对外部引用进行线索一致性、完整性和支撑关系审查（基于讨论文本，不接外部文献数据库）。
 - TF-IDF 跨 Run 记忆检索：从 StructuredIRV2 和 StructuredBrief 中提取候选方向、关键主张、批判点和机会点。
 - 模式升级链路：Quick Probe → Focused Panel → Full Deliberation，并自动携带前序上下文。
 - SSE 实时推送：状态流和 token 流双通道。

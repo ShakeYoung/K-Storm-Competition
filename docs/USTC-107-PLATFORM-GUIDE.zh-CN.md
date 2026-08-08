@@ -18,7 +18,7 @@ K-Storm 面向“一〇七杯”智能体赛道时，推荐将中国科大 107 �
 
 ```text
 供应商：中国科大 107 算力平台
-Base URL：https://107.ustc.edu.cn/v1
+Base URL：https://api.llm.ustc.edu.cn/v1
 API 类型：OpenAI Compatible
 API Key：填写 107 平台发放的个人或比赛密钥
 ```
@@ -48,6 +48,8 @@ API Key：填写 107 平台发放的个人或比赛密钥
 | Feasibility Agent | `deepseek-v4-flash` | 压实实验路线和成本 |
 | Reviewer Agent | `glm-5.2` 或 `smart/reasoning` | 模拟导师/评审质疑 |
 | Moderator | `glm-5.2` | 汇总冲突、遗漏和下一轮议程 |
+| Critique Agent | `glm-5.2` 或 `deepseek-v4-pro` | 六维独立批判审查 |
+| Citation Review | `deepseek-v4-flash` 或 `qwen3.6-chat` | 引用线索一致性检查 |
 | Group Summarizer | `deepseek-v4-pro` | 生成结构化 IR |
 | Output Agent | `glm-5.2` 或 `deepseek-v4-pro` | 生成最终报告 |
 
@@ -98,7 +100,7 @@ docs/screenshots/history-page.png
 
 ## 故障排查
 
-- 如果模型列表读取失败，先检查 Base URL 是否为 `https://107.ustc.edu.cn/v1`，再检查 API Key 是否过期。
+- 如果模型列表读取失败，先检查 Base URL 是否为 `https://api.llm.ustc.edu.cn/v1`，再检查 API Key 是否过期。
 - 如果 TLS 校验失败，可在模型设置中临时开启“不安全 TLS”，但正式演示建议修复证书或网络代理问题。
 - 如果输出中断，K-Storm 会检测结束标记和关键结构；失败 Run 可从历史记录中继续分析。
 - 如果现场网络不稳定，可提前准备 mock provider 演示包，但正式材料中应说明真实模型调用使用 107 平台。
