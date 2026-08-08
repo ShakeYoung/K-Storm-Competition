@@ -11,7 +11,7 @@ import urllib.request
 
 logger = logging.getLogger(__name__)
 
-from fastapi import BackgroundTasks, Body, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Body, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -115,6 +115,9 @@ if ASSETS_DIR.exists():
 @app.on_event("startup")
 def startup() -> None:
     db.init_db()
+    recovered = db.mark_stale_runs_failed()
+    if recovered:
+        logger.info("recovered %d stale runs from previous process (marked FAILED)", recovered)
 
 
 @app.get("/api/health")
@@ -223,14 +226,17 @@ def get_run(run_id: str) -> RunRecord:
 
 
 @app.get("/api/runs/{run_id}/stream")
-async def stream_run(run_id: str) -> StreamingResponse:
-    """SSE 端点：run 状态或消息数量变化时推送完整 run 快照。"""
+async def stream_run(run_id: str, request: Request) -> StreamingResponse:
+    """SSE 端点：run 状态或消息数量变化时推送完整 run 快照。
+    不设固定时长上限：run 进入终态或客户端断开时结束。
+    """
     terminal = {"COMPLETED", "FAILED", "CANCELED"}
 
     async def _gen():
         prev_hash = None
-        # 最多等待 90 分钟（每 0.8s 检查一次）
-        for _ in range(6750):
+        while True:
+            if await request.is_disconnected():
+                return
             try:
                 run = db.get_run(run_id)
             except KeyError:
@@ -248,8 +254,6 @@ async def stream_run(run_id: str) -> StreamingResponse:
 
             await asyncio.sleep(0.8)
 
-        yield f"data: {json.dumps({'error': 'timeout'})}\n\n"
-
     return StreamingResponse(
         _gen(),
         media_type="text/event-stream",
@@ -262,17 +266,18 @@ async def stream_run(run_id: str) -> StreamingResponse:
 
 
 @app.get("/api/runs/{run_id}/token-stream")
-async def token_stream(run_id: str) -> StreamingResponse:
+async def token_stream(run_id: str, request: Request) -> StreamingResponse:
     """SSE 端点：推送当前正在生成的 agent 的逐字 token 流。
     每 100 ms 检查一次 buffer；buffer 内容变化时才推送，减少空推。
-    run 进入终态时发送 {done: true} 并关闭流。
+    run 进入终态时发送 {done: true} 并关闭流；客户端断开时直接结束。
     """
     terminal = {"COMPLETED", "FAILED", "CANCELED"}
 
     async def _gen():
         prev_partial = None
-        # 最长 90 分钟（每 100ms 一次 = 54000 次）
-        for _ in range(54000):
+        while True:
+            if await request.is_disconnected():
+                return
             try:
                 run = db.get_run(run_id)
             except KeyError:
@@ -293,7 +298,15 @@ async def token_stream(run_id: str) -> StreamingResponse:
 
             await asyncio.sleep(0.1)
 
-        yield f"data: {json.dumps({'done': True, 'error': 'timeout'})}\n\n"
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
     return StreamingResponse(
         _gen(),

@@ -272,6 +272,50 @@ def delete_runs(run_ids: list[str]) -> int:
         return cursor.rowcount
 
 
+# 进程异常退出时可能遗留的"进行中"状态（服务重启后应回收为 FAILED，可一键恢复）
+_STALE_RUNNING_STATUSES = (
+    RunStatus.TEMPLATE_VALIDATED.value,
+    RunStatus.INTAKE_RUNNING.value,
+    RunStatus.DEBATE_RUNNING.value,
+    RunStatus.CRITIQUE_RUNNING.value,
+    RunStatus.GROUP_SUMMARY_RUNNING.value,
+    RunStatus.CITATION_REVIEW_RUNNING.value,
+    RunStatus.FINAL_REPORT_RUNNING.value,
+)
+
+
+def mark_stale_runs_failed() -> int:
+    """把上次进程中断遗留的进行中 run 标记为 FAILED，附可恢复错误信息。
+
+    返回被回收的 run 数量。仅在服务启动时调用一次；对已完成/失败/取消的 run 无影响。
+    """
+    placeholders = ", ".join("?" for _ in _STALE_RUNNING_STATUSES)
+    with connect() as db:
+        rows = db.execute(
+            f"SELECT run_id FROM runs WHERE status IN ({placeholders})",
+            _STALE_RUNNING_STATUSES,
+        ).fetchall()
+        if not rows:
+            return 0
+        ids = [row["run_id"] for row in rows]
+        update_placeholders = ", ".join("?" for _ in ids)
+        db.execute(
+            f"""
+            UPDATE runs
+            SET status = ?, error = ?, current_step = ?, updated_at = ?
+            WHERE run_id IN ({update_placeholders})
+            """,
+            [
+                RunStatus.FAILED.value,
+                "服务重启中断，可点击「继续分析」从失败位置恢复",
+                "服务重启中断",
+                utc_now(),
+                *ids,
+            ],
+        )
+        return len(ids)
+
+
 def history_location() -> dict[str, str]:
     return {
         "folder": str(DB_PATH.parent),

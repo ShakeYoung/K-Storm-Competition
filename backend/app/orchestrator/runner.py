@@ -91,6 +91,37 @@ def inject_upgrade_context(run: RunRecord, structured_brief: StructuredBrief) ->
         structured_brief.intake_synthesis += "\n".join(parts)
 
 
+def inject_memory_context(run: RunRecord, structured_brief: StructuredBrief) -> None:
+    """记忆查询模式：将 source_run_id 指向的历史 run 的 briefing / IR / 讨论摘要注入到当前 brief。
+    直接修改 structured_brief.intake_synthesis（原地更新，无返回值）。
+    """
+    if not run.source_run_id:
+        return
+    try:
+        source = db.get_run(run.source_run_id)
+    except Exception:
+        return  # source run 不存在时静默跳过
+
+    memory_parts = []
+    sb = source.structured_brief
+    if sb:
+        if sb.known_facts:
+            memory_parts.append("已知事实:" + ";".join(sb.known_facts[:6]))
+        if sb.unknowns:
+            memory_parts.append("未知问题:" + ";".join(sb.unknowns[:4]))
+        if sb.constraints:
+            memory_parts.append("约束条件:" + ";".join(sb.constraints[:4]))
+        if sb.opportunity_points:
+            memory_parts.append("机会点:" + ";".join(sb.opportunity_points[:4]))
+    if source.group_summary:
+        memory_parts.append("\n结构化 IR 摘要:\n" + source.group_summary[:1500])
+    if source.debate_messages:
+        samples = [f"[{m.agent} · 第{m.round}轮]:{m.content[:300]}" for m in source.debate_messages[:4]]
+        memory_parts.append("\n讨论摘要:\n" + "\n".join(samples))
+    if memory_parts:
+        structured_brief.intake_synthesis += "\n\n## 记忆上下文(来自历史讨论:" + source.template_input.field + ")\n\n" + "\n".join(memory_parts)
+
+
 def set_stream_buffer(run_id: str, text: str, meta: dict | None = None) -> None:
     with _STREAM_LOCK:
         _STREAM_BUFFERS[run_id] = text
@@ -523,29 +554,7 @@ def execute_focused_panel(
     ensure_not_canceled(run.run_id)
     structured_brief.intake_synthesis = intake_note
     # 注入记忆上下文(如果有源 run)
-    if run.source_run_id:
-        try:
-            source = db.get_run(run.source_run_id)
-            memory_parts = []
-            sb = source.structured_brief
-            if sb:
-                if sb.known_facts:
-                    memory_parts.append("已知事实:" + ";".join(sb.known_facts[:6]))
-                if sb.unknowns:
-                    memory_parts.append("未知问题:" + ";".join(sb.unknowns[:4]))
-                if sb.constraints:
-                    memory_parts.append("约束条件:" + ";".join(sb.constraints[:4]))
-                if sb.opportunity_points:
-                    memory_parts.append("机会点:" + ";".join(sb.opportunity_points[:4]))
-            if source.group_summary:
-                memory_parts.append("\n结构化 IR 摘要:\n" + source.group_summary[:1500])
-            if source.debate_messages:
-                samples = [f"[{m.agent} · 第{m.round}轮]:{m.content[:300]}" for m in source.debate_messages[:4]]
-                memory_parts.append("\n讨论摘要:\n" + "\n".join(samples))
-            if memory_parts:
-                structured_brief.intake_synthesis += "\n\n## 记忆上下文(来自历史讨论:" + source.template_input.field + ")\n\n" + "\n".join(memory_parts)
-        except Exception:
-            pass  # source run 不存在时静默跳过
+    inject_memory_context(run, structured_brief)
     inject_upgrade_context(run, structured_brief)
     timeline = finish_timeline_step(timeline, "intake")
     run = update_run_checked(run.run_id, structured_brief=structured_brief, timeline=timeline)
@@ -744,8 +753,14 @@ def resume_run_safe(
     provider: ModelProvider,
     parallel_first_round: bool = False,
 ) -> None:
+    """按 run 的讨论模式路由恢复路径，避免聚焦/快速探测被当成完整讨论重跑。"""
     try:
-        resume_run(run, rounds, provider, run.documents, parallel_first_round)
+        if run.mode in (DiscussionMode.FOCUSED_PANEL, DiscussionMode.MEMORY_QUERY):
+            resume_focused_panel(run, rounds, provider, run.documents)
+        elif run.mode == DiscussionMode.QUICK_PROBE:
+            resume_quick_probe(run, provider, run.documents)
+        else:
+            resume_run(run, rounds, provider, run.documents, parallel_first_round)
     except RunCanceled:
         return
     except Exception as exc:
@@ -762,6 +777,146 @@ def resume_run_safe(
         )
     finally:
         _CANCELED_RUNS.discard(run.run_id)
+
+
+def resume_focused_panel(
+    run: RunRecord,
+    rounds: int,
+    provider: ModelProvider,
+    documents: list[UploadedDocument],
+) -> RunRecord:
+    """从失败位置继续 Focused Panel / Memory Query：只补跑未完成的步骤，
+    沿用选定 Agent 与对应的精简 IR / 报告 prompt，不走完整讨论流程。"""
+    _CANCELED_RUNS.discard(run.run_id)
+    documents = documents or []
+    timeline = run.timeline or build_timeline(rounds, False, documents)
+    timeline = prepare_timeline_for_resume(timeline, rounds, False, documents)
+    run = db.update_run(
+        run.run_id,
+        status=RunStatus.TEMPLATE_VALIDATED,
+        current_step="准备从失败位置继续",
+        error="",
+        timeline=timeline,
+        _force=True,
+    )
+    ensure_not_canceled(run.run_id)
+
+    structured_brief = run.structured_brief
+    if structured_brief is None:
+        timeline = start_timeline_step(run.timeline, "template")
+        timeline = finish_timeline_step(timeline, "template")
+        run = update_run_checked(
+            run.run_id,
+            status=RunStatus.TEMPLATE_VALIDATED,
+            current_step="创建运行并校验模板",
+            timeline=timeline,
+        )
+        structured_brief, timeline, run = run_intake_step(run, provider, documents, timeline)
+        # 恢复路径重建 brief 后，需要重新注入记忆与升级上下文（与 execute_focused_panel 保持一致），
+        # 并回写 DB——run_intake_step 已把未注入的 brief 写入，必须用注入后的版本覆盖
+        inject_memory_context(run, structured_brief)
+        inject_upgrade_context(run, structured_brief)
+        run = update_run_checked(run.run_id, structured_brief=structured_brief)
+    else:
+        timeline = run.timeline
+
+    messages = list(run.debate_messages)
+    timeline = ensure_handoff_step(timeline)
+    run = update_run_checked(run.run_id, status=RunStatus.DEBATE_RUNNING, timeline=timeline)
+
+    agents = [a for a in DISCUSSION_AGENTS if a.key in (run.selected_agents or [])]
+    if not agents:
+        agents = DISCUSSION_AGENTS[:2]  # 与 execute_focused_panel 的 fallback 一致
+
+    for round_number in range(1, rounds + 1):
+        for agent in agents:
+            if has_agent_message(messages, round_number, agent):
+                timeline = finish_timeline_step(timeline, debate_step_key(round_number, agent))
+                continue
+            messages, timeline, run = run_debate_agent(
+                run,
+                structured_brief,
+                provider,
+                messages,
+                timeline,
+                round_number,
+                agent,
+                independent_first_round=False,
+            )
+
+    is_memory = run.mode == DiscussionMode.MEMORY_QUERY
+    if not run.group_summary:
+        prompt_fn = summary_prompt_focused if is_memory else summary_prompt
+        group_summary, timeline, run = run_group_summary_step(
+            run, structured_brief, provider, messages, timeline, prompt_fn=prompt_fn
+        )
+        if not run.external_references:
+            external_references = extract_references(messages)
+            run = update_run_checked(run.run_id, external_references=external_references)
+    elif not run.structured_ir:
+        structured_ir = parse_structured_ir_v2(run.group_summary, run.template_input, structured_brief, messages)
+        ir_warnings = document_budget_warnings(run.documents) + (validate_structured_ir(structured_ir) if structured_ir else [])
+        external_references = extract_references(messages)
+        run = update_run_checked(run.run_id, structured_ir=structured_ir, ir_warnings=ir_warnings, external_references=external_references)
+
+    if not run.external_references:
+        external_references = extract_references(messages)
+        run = update_run_checked(run.run_id, external_references=external_references)
+
+    if not run.final_report:
+        if is_memory:
+            source_summary = ""
+            if run.source_run_id:
+                try:
+                    source = db.get_run(run.source_run_id)
+                    if source.group_summary:
+                        source_summary = source.group_summary[:600]
+                except KeyError:
+                    pass
+            report_fn = lambda **kw: report_prompt_memory(source_summary=source_summary, **kw)
+            report_label = "追问分析报告"
+        else:
+            report_fn = report_prompt_focused
+            report_label = "聚焦分析报告"
+        _, timeline, run = run_final_report_step(
+            run,
+            structured_brief,
+            provider,
+            messages,
+            run.group_summary,
+            timeline,
+            report_prompt_fn=report_fn,
+            report_label=report_label,
+        )
+    elif run.status != RunStatus.COMPLETED:
+        # 报告已存在但收尾未完成（极端写入窗口）：补全终态，避免 run 悬挂
+        timeline = finish_timeline_step(timeline, "overall")
+        run = update_run_checked(run.run_id, status=RunStatus.COMPLETED, current_step="分析完成", timeline=timeline)
+    return run
+
+
+def resume_quick_probe(
+    run: RunRecord,
+    provider: ModelProvider,
+    documents: list[UploadedDocument],
+) -> RunRecord:
+    """Quick Probe 恢复：已有回答则直接收尾，否则重新执行单次探测。"""
+    _CANCELED_RUNS.discard(run.run_id)
+    if run.debate_messages:
+        # 回答已生成，仅缺失收尾状态（例如最终写入失败）：时间线整体标记完成
+        now = now_iso()
+        timeline = [
+            step.model_copy(update={"status": "completed", "started_at": step.started_at or now, "finished_at": now})
+            for step in build_timeline(1, False, documents)
+        ]
+        return db.update_run(
+            run.run_id,
+            status=RunStatus.COMPLETED,
+            current_step="快速探测完成",
+            timeline=timeline,
+            _force=True,
+        )
+    return execute_quick_probe(run, provider, documents, run.probe_agent, run.probe_question)
 
 
 def rerun(source: RunRecord, provider: ModelProvider) -> RunRecord:
@@ -1274,6 +1429,7 @@ def run_group_summary_step(
     provider: ModelProvider,
     messages: list[DebateMessage],
     timeline: list[TimelineStep],
+    prompt_fn=None,
 ) -> tuple[str, list[TimelineStep], RunRecord]:
     timeline = start_timeline_step(timeline, "group_summary")
     run = update_run_checked(
@@ -1286,7 +1442,7 @@ def run_group_summary_step(
         provider,
         agent_key=GROUP_SUMMARIZER.key,
         system_prompt=GROUP_SUMMARIZER.system_prompt,
-        user_prompt=summary_prompt(run.template_input, structured_brief, messages, run.research_stage),
+        user_prompt=(prompt_fn or summary_prompt)(run.template_input, structured_brief, messages, run.research_stage),
         max_tokens=OUTPUT_LIMITS["group_summary"],
         on_retry=retry_callback(run.run_id, "group_summary", "结构化 IR"),
         kind="group_summary",
@@ -1391,30 +1547,32 @@ def run_final_report_step(
     messages: list[DebateMessage],
     group_summary: str,
     timeline: list[TimelineStep],
+    report_prompt_fn=None,
+    report_label: str = "出口模型生成最终报告",
 ) -> tuple[str, list[TimelineStep], RunRecord]:
     timeline = start_timeline_step(timeline, "final_report")
     run = update_run_checked(
         run.run_id,
         status=RunStatus.FINAL_REPORT_RUNNING,
-        current_step=f"出口模型生成最终报告({provider.label_for(OUTPUT_AGENT.key)})",
+        current_step=f"{report_label}({provider.label_for(OUTPUT_AGENT.key)})",
         timeline=timeline,
     )
     final_report = clean_final_report(generate_validated(
         provider,
         agent_key=OUTPUT_AGENT.key,
         system_prompt=OUTPUT_AGENT.system_prompt,
-        user_prompt=report_prompt(
-            run.template_input,
-            structured_brief,
-            messages,
-            group_summary,
-            run.structured_ir,
-            run.research_stage,
+        user_prompt=(report_prompt_fn or report_prompt)(
+            template=run.template_input,
+            brief=structured_brief,
+            messages=messages,
+            group_summary=group_summary,
+            structured_ir=run.structured_ir,
+            research_stage=run.research_stage,
         ),
         max_tokens=OUTPUT_LIMITS["final_report"],
-        on_retry=retry_callback(run.run_id, "final_report", "出口模型生成最终报告"),
+        on_retry=retry_callback(run.run_id, "final_report", report_label),
         kind="final_report",
-        stage_label="出口模型生成最终报告",
+        stage_label=report_label,
     ))
     ensure_not_canceled(run.run_id)
     timeline = finish_timeline_step(timeline, "final_report")
