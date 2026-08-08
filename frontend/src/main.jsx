@@ -23,6 +23,16 @@ import {
   X,
 } from "lucide-react";
 import "./styles/app.css";
+import {
+  downloadJsonFile,
+  downloadMarkdown,
+  downloadRunBundle,
+  openPdfPrintWindow,
+  reportFilename,
+  runJsonFilename,
+  buildBundleMD,
+} from "./lib/download.js";
+import { highlightKeyword, markdownToHtml } from "./lib/markdown.js";
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
@@ -178,7 +188,7 @@ const ACTIVE_RUN_STATES = [
 function statusBadgeClass(status) {
   if (status === "COMPLETED") return "completed";
   if (status === "FAILED") return "failed";
-  if (status === "CANCELED") return "pending";
+  if (status === "CANCELED") return "canceled";
   if (ACTIVE_RUN_STATES.includes(status)) return "running";
   return "pending";
 }
@@ -425,28 +435,6 @@ function inferParallelFirstRound(run) {
   );
 }
 
-function baseExportName(run) {
-  const raw = `${run?.template_input?.field || "K-Storm-report"}-${run?.run_id || "run"}`;
-  return raw
-    .replace(/[\\/:*?"<>|]+/g, " ")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 80) || "K-Storm-report";
-}
-
-function reportFilename(run) {
-  return `${baseExportName(run)}.md`;
-}
-
-function runJsonFilename(run) {
-  return `${baseExportName(run)}.json`;
-}
-
-function bundleFilename(run) {
-  return `${baseExportName(run)}-bundle.zip`;
-}
-
 function normalizeLoadedDocuments(documents = []) {
   return documents.map((document, index) => ({
     ...document,
@@ -454,200 +442,6 @@ function normalizeLoadedDocuments(documents = []) {
     note: document.note || "",
     summary: document.summary || "",
   }));
-}
-
-function downloadTextFile(text, filename, mimeType) {
-  const blob = new Blob([text], { type: `${mimeType};charset=utf-8` });
-  downloadBlob(blob, filename);
-}
-
-function downloadMarkdown(text, filename) {
-  downloadTextFile(text, filename, "text/markdown");
-}
-
-function downloadJsonFile(value, filename) {
-  downloadTextFile(JSON.stringify(value, null, 2), filename, "application/json");
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function bundleEntriesForRun(run) {
-  const entries = [];
-  if (run?.final_report) {
-    entries.push({ name: "report.md", data: run.final_report });
-  }
-  if (run?.group_summary) {
-    entries.push({ name: "structured-ir.md", data: run.group_summary });
-  }
-  if (run?.debate_messages?.length) {
-    const debateMD = run.debate_messages.map(
-      (msg) => `### ${msg.agent} · 第 ${msg.round} 轮\n\n${msg.content}`,
-    ).join("\n\n---\n\n");
-    entries.push({ name: "debate.md", data: `# 讨论记录\n\n${debateMD}` });
-  }
-  entries.push({
-    name: "metadata.json",
-    data: JSON.stringify(
-      {
-        run_id: run?.run_id,
-        status: run?.status,
-        exported_at: new Date().toISOString(),
-        field: run?.template_input?.field || "",
-        rounds: run?.rounds,
-        created_at: run?.created_at,
-      },
-      null,
-      2,
-    ),
-  });
-  return entries;
-}
-
-function buildBundleMD(run) {
-  const parts = [];
-  parts.push(`# K-Storm 讨论打包`);
-  parts.push(``);
-  parts.push(`**Run ID**：${run?.run_id || ""}`);
-  parts.push(`**领域**：${run?.template_input?.field || ""}`);
-  parts.push(`**时间**：${run?.created_at ? new Date(run.created_at).toLocaleString() : ""}`);
-  parts.push(``);
-  if (run?.final_report) {
-    parts.push(`---`);
-    parts.push(``);
-    parts.push(`## 最终报告`);
-    parts.push(``);
-    parts.push(run.final_report);
-    parts.push(``);
-  }
-  if (run?.debate_messages?.length) {
-    parts.push(`---`);
-    parts.push(``);
-    parts.push(`## 讨论记录`);
-    parts.push(``);
-    for (const msg of run.debate_messages) {
-      parts.push(`### ${msg.agent} · 第 ${msg.round} 轮`);
-      parts.push(``);
-      parts.push(msg.content);
-      parts.push(``);
-    }
-  }
-  return parts.join("\n");
-}
-
-function downloadRunBundle(run) {
-  const entries = bundleEntriesForRun(run);
-  if (!entries.length) return;
-  const blob = createZipBlob(entries);
-  downloadBlob(blob, bundleFilename(run));
-}
-
-const ZIP_CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let index = 0; index < 256; index += 1) {
-    let value = index;
-    for (let bit = 0; bit < 8; bit += 1) {
-      value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
-    }
-    table[index] = value >>> 0;
-  }
-  return table;
-})();
-
-function crc32(bytes) {
-  let crc = 0xffffffff;
-  for (const byte of bytes) {
-    crc = ZIP_CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function zipTimestampParts(date = new Date()) {
-  const year = Math.max(1980, date.getFullYear());
-  return {
-    time:
-      ((date.getHours() & 0x1f) << 11) |
-      ((date.getMinutes() & 0x3f) << 5) |
-      Math.floor(date.getSeconds() / 2),
-    date: (((year - 1980) & 0x7f) << 9) | (((date.getMonth() + 1) & 0x0f) << 5) | (date.getDate() & 0x1f),
-  };
-}
-
-function createZipBlob(entries) {
-  const encoder = new TextEncoder();
-  const locals = [];
-  const centrals = [];
-  let offset = 0;
-  const stamp = zipTimestampParts();
-
-  for (const entry of entries) {
-    const nameBytes = encoder.encode(entry.name);
-    const dataBytes = entry.data instanceof Uint8Array ? entry.data : encoder.encode(String(entry.data));
-    const crc = crc32(dataBytes);
-
-    const local = new Uint8Array(30 + nameBytes.length + dataBytes.length);
-    const localView = new DataView(local.buffer);
-    localView.setUint32(0, 0x04034b50, true);
-    localView.setUint16(4, 20, true);
-    localView.setUint16(6, 0, true);
-    localView.setUint16(8, 0, true);
-    localView.setUint16(10, stamp.time, true);
-    localView.setUint16(12, stamp.date, true);
-    localView.setUint32(14, crc, true);
-    localView.setUint32(18, dataBytes.length, true);
-    localView.setUint32(22, dataBytes.length, true);
-    localView.setUint16(26, nameBytes.length, true);
-    localView.setUint16(28, 0, true);
-    local.set(nameBytes, 30);
-    local.set(dataBytes, 30 + nameBytes.length);
-    locals.push(local);
-
-    const central = new Uint8Array(46 + nameBytes.length);
-    const centralView = new DataView(central.buffer);
-    centralView.setUint32(0, 0x02014b50, true);
-    centralView.setUint16(4, 20, true);
-    centralView.setUint16(6, 20, true);
-    centralView.setUint16(8, 0, true);
-    centralView.setUint16(10, 0, true);
-    centralView.setUint16(12, stamp.time, true);
-    centralView.setUint16(14, stamp.date, true);
-    centralView.setUint32(16, crc, true);
-    centralView.setUint32(20, dataBytes.length, true);
-    centralView.setUint32(24, dataBytes.length, true);
-    centralView.setUint16(28, nameBytes.length, true);
-    centralView.setUint16(30, 0, true);
-    centralView.setUint16(32, 0, true);
-    centralView.setUint16(34, 0, true);
-    centralView.setUint16(36, 0, true);
-    centralView.setUint32(38, 0, true);
-    centralView.setUint32(42, offset, true);
-    central.set(nameBytes, 46);
-    centrals.push(central);
-
-    offset += local.length;
-  }
-
-  const centralSize = centrals.reduce((sum, item) => sum + item.length, 0);
-  const end = new Uint8Array(22);
-  const endView = new DataView(end.buffer);
-  endView.setUint32(0, 0x06054b50, true);
-  endView.setUint16(4, 0, true);
-  endView.setUint16(6, 0, true);
-  endView.setUint16(8, entries.length, true);
-  endView.setUint16(10, entries.length, true);
-  endView.setUint32(12, centralSize, true);
-  endView.setUint32(16, offset, true);
-  endView.setUint16(20, 0, true);
-
-  return new Blob([...locals, ...centrals, end], { type: "application/zip" });
 }
 
 
@@ -887,23 +681,32 @@ function App() {
 
   function _startPolling(runId) {
     if (pollRef.current) window.clearInterval(pollRef.current);
+    let consecutiveErrors = 0;
     pollRef.current = window.setInterval(async () => {
       try {
         const response = await fetch(`${API_BASE}/api/runs/${runId}`);
         if (!response.ok) throw new Error(await readError(response));
         const data = await response.json();
+        consecutiveErrors = 0;
         setRun(data);
-        if (["COMPLETED", "FAILED"].includes(data.status)) {
+        if (["COMPLETED", "FAILED", "CANCELED"].includes(data.status)) {
           window.clearInterval(pollRef.current);
           pollRef.current = null;
           setLoading(false);
+          // 修复：终态必须清空 streamingPartial，避免残留"生成中"幻影卡
+          setStreamingPartial(null);
           loadHistory();
         }
       } catch (err) {
-        window.clearInterval(pollRef.current);
-        pollRef.current = null;
-        setLoading(false);
-        setError(err.message || "读取进度失败");
+        // 修复：瞬时网络错误不终止轮询（原实现一次失败即永久停止）；
+        // 连续失败 5 次才停止并提示，避免断网后进度永远冻结
+        consecutiveErrors += 1;
+        if (consecutiveErrors >= 5) {
+          window.clearInterval(pollRef.current);
+          pollRef.current = null;
+          setLoading(false);
+          setError(err.message || "读取进度失败");
+        }
       }
     }, 900);
   }
@@ -1000,6 +803,12 @@ function App() {
       sseRef.current.close();
       sseRef.current = null;
     }
+    // 修复：旧 run 的 token 流连接必须一并关闭，否则会继续 setStreamingPartial 泄漏
+    if (tokenStreamRef.current) {
+      tokenStreamRef.current.close();
+      tokenStreamRef.current = null;
+    }
+    setStreamingPartial(null);
     setLoading(true);
     setError("");
     let loadedData = null;
@@ -1134,28 +943,7 @@ function App() {
   }
 
   function exportPDF(content, title) {
-    if (!content) return;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0A1628;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#1A52B8;border-bottom:2px solid #1A52B8;padding-bottom:8px}
-      h2{font-size:18px;color:#0A1628;margin-top:28px}
-      h3{font-size:15px;color:#2C3E6A}
-      blockquote{border-left:3px solid #1A52B8;padding-left:12px;color:#2C3E6A;margin:12px 0}
-      code{background:#F2F6FD;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#F2F6FD;padding:14px;border-radius:8px;overflow-x:auto}
-      table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #D6E0F2;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#E8F0FF;font-weight:700}
-      ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #D6E0F2;margin:20px 0}
-      @media print{body{margin:0;padding:20px;max-width:none}}
-    </style></head><body>${markdownToHtml(content)}</body></html>`;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+    openPdfPrintWindow(content, title);
   }
 
   async function copyReport() {
@@ -1292,10 +1080,6 @@ function App() {
                 completion={completion}
                 canSubmit={canSubmit}
                 loading={loading}
-                rounds={rounds}
-                setRounds={setRounds}
-                parallelFirstRound={parallelFirstRound}
-                setParallelFirstRound={setParallelFirstRound}
                 documents={documents}
                 addDocuments={addDocuments}
                 updateDocument={updateDocument}
@@ -1613,10 +1397,6 @@ function TemplatePanel({
   completion,
   canSubmit,
   loading,
-  rounds,
-  setRounds,
-  parallelFirstRound,
-  setParallelFirstRound,
   documents,
   addDocuments,
   updateDocument,
@@ -1627,7 +1407,6 @@ function TemplatePanel({
   setRunName,
 }) {
   const [selectedScene, setSelectedScene] = React.useState("");
-  const isQuickOrMemory = mode === "quick" || mode === "memory";
   const submitLabel = mode === "quick" ? "快速探测" : mode === "memory" ? "查询记忆" : mode === "focused" ? "启动专题研讨" : "开始分析";
 
   function applyTemplatePreset(preset, sceneId = "") {
@@ -1832,7 +1611,6 @@ function TemplatePanel({
         </div>
       </section>
 
-      {!isQuickOrMemory ? null : null}
       <button
         className="primary-action"
         disabled={!canSubmit || loading}
@@ -2684,29 +2462,7 @@ function DownloadMenu({ label, icon, mdContent, pdfContent, pdfTitle, disabled }
   }
   function handlePDF() {
     setOpen(false);
-    const content = pdfContent || mdContent;
-    if (!content) return;
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${pdfTitle || "K-Storm"}</title><style>
-      body{font-family:Inter,system-ui,sans-serif;max-width:800px;margin:40px auto;padding:0 20px;color:#0A1628;line-height:1.7;font-size:14px}
-      h1{font-size:24px;color:#1A52B8;border-bottom:2px solid #1A52B8;padding-bottom:8px}
-      h2{font-size:18px;color:#0A1628;margin-top:28px}
-      h3{font-size:15px;color:#2C3E6A}
-      blockquote{border-left:3px solid #1A52B8;padding-left:12px;color:#2C3E6A;margin:12px 0}
-      code{background:#F2F6FD;padding:2px 6px;border-radius:4px;font-size:13px}
-      pre{background:#F2F6FD;padding:14px;border-radius:8px;overflow-x:auto}
-      table{border-collapse:collapse;width:100%;margin:12px 0}
-      th,td{border:1px solid #D6E0F2;padding:8px 10px;text-align:left;font-size:13px}
-      th{background:#E8F0FF;font-weight:700}
-      ul,ol{padding-left:22px}
-      hr{border:0;border-top:1px solid #D6E0F2;margin:20px 0}
-      @media print{body{margin:0;padding:20px;max-width:none}}
-    </style></head><body>${markdownToHtml(content)}</body></html>`;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => win.print(), 400);
+    openPdfPrintWindow(pdfContent || mdContent, pdfTitle || "K-Storm");
   }
 
   return (
@@ -3479,20 +3235,24 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
   }
 
   function deleteProvider() {
+    const deletedId = activeProvider.id;
     setSettings((current) => {
       const providers = current.providers.filter(
-        (provider) => provider.id !== activeProvider.id,
+        (provider) => provider.id !== deletedId,
       );
       const assignments = { ...current.assignments };
       for (const key of Object.keys(assignments)) {
-        if (assignments[key].startsWith(`${activeProvider.id}:`)) delete assignments[key];
+        if (assignments[key].startsWith(`${deletedId}:`)) delete assignments[key];
       }
       return {
         providers: providers.length ? providers : defaultModelSettings.providers,
         assignments,
       };
     });
-    setActiveProviderId(settings.providers[0]?.id);
+    // 修复：原实现读取删除前的 settings.providers[0]，删除第一个供应商时 active 会指向已删除 id；
+    // 改为从剩余列表里取下一个 active（删除的不是第一个则保持当前选择不变）
+    const nextActive = settings.providers.find((provider) => provider.id !== deletedId);
+    setActiveProviderId(nextActive?.id || defaultModelSettings.providers[0]?.id || "");
   }
 
   function addModel() {
@@ -3811,159 +3571,6 @@ function SettingsModal({ settings, setSettings, onClose, setError }) {
         </section>
       </div>
     </section>
-  );
-}
-
-/**
- * 在已渲染的 HTML 文本节点中高亮关键词（只替换 >…< 之间的文本，不动标签属性）。
- */
-function highlightKeyword(html, keyword) {
-  if (!keyword || !keyword.trim()) return html;
-  const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`(${esc})`, "gi");
-  return html.replace(/>([^<]+)</g, (_, text) =>
-    ">" + text.replace(re, '<mark class="kw-hl">$1</mark>') + "<"
-  );
-}
-
-function markdownToHtml(markdown) {
-  const raw = String(markdown || "").trim();
-  // If the content looks like raw JSON, render it as a formatted code block
-  if (raw.startsWith("{") && raw.includes('"version"')) {
-    try {
-      const obj = JSON.parse(raw);
-      return '<div class="json-fallback-notice"><strong>模型输出为 JSON 格式（Markdown 部分缺失），以下是解析后的内容：</strong></div>'
-        + '<pre style="background:var(--panel-muted);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;overflow-x:auto;font-size:13px;line-height:1.6;white-space:pre-wrap;word-break:break-all">'
-        + JSON.stringify(obj, null, 2)
-          .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        + '</pre>';
-    } catch {
-      // Not valid JSON, render as-is
-    }
-  }
-  const lines = String(markdown || "").split(/\r?\n/);
-  let html = "";
-  let listType = "";
-  let inCode = false;
-  const closeList = () => {
-    if (listType) {
-      html += `</${listType}>`;
-      listType = "";
-    }
-  };
-  const renderTable = (tableLines) => {
-    const rows = tableLines
-      .filter(
-        (row) =>
-          !/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(row),
-      )
-      .map((row) =>
-        row
-          .trim()
-          .replace(/^\|/, "")
-          .replace(/\|$/, "")
-          .split("|")
-          .map((cell) => cell.trim()),
-      );
-    if (!rows.length) return "";
-    const head = rows[0];
-    const body = rows.slice(1);
-    return `<div class="markdown-table-wrap"><table><thead><tr>${head
-      .map((cell) => `<th>${inlineMarkdown(cell)}</th>`)
-      .join("")}</tr></thead><tbody>${body
-      .map(
-        (row) =>
-          `<tr>${head
-            .map((_, index) => `<td>${inlineMarkdown(row[index] || "")}</td>`)
-            .join("")}</tr>`,
-      )
-      .join("")}</tbody></table></div>`;
-  };
-  for (let index = 0; index < lines.length; index += 1) {
-    const rawLine = lines[index];
-    const line = rawLine.trimEnd();
-    const trimmed = line.trim();
-    if (trimmed.startsWith("```")) {
-      closeList();
-      if (!inCode) {
-        html += "<pre><code>";
-        inCode = true;
-      } else {
-        html += "</code></pre>";
-        inCode = false;
-      }
-      continue;
-    }
-    if (inCode) {
-      html += `${escapeHtml(line)}\n`;
-      continue;
-    }
-    if (!trimmed) {
-      closeList();
-      continue;
-    }
-    if (isTableLine(trimmed)) {
-      closeList();
-      const tableLines = [line];
-      while (index + 1 < lines.length && isTableLine(lines[index + 1].trim())) {
-        index += 1;
-        tableLines.push(lines[index]);
-      }
-      html += renderTable(tableLines);
-      continue;
-    }
-    if (/^[-*_]{3,}$/.test(trimmed)) {
-      closeList();
-      html += "<hr />";
-    } else if (/^#{1,6}\s*/.test(trimmed)) {
-      closeList();
-      const match = trimmed.match(/^(#{1,6})\s*(.+)$/);
-      const level = Math.min(match?.[1]?.length || 3, 3);
-      html += `<h${level}>${inlineMarkdown(match?.[2] || trimmed)}</h${level}>`;
-    } else if (/^>\s?/.test(trimmed)) {
-      closeList();
-      html += `<blockquote>${inlineMarkdown(trimmed.replace(/^>\s?/, ""))}</blockquote>`;
-    } else if (/^[-*+]\s+/.test(trimmed)) {
-      if (listType !== "ul") {
-        closeList();
-        html += "<ul>";
-        listType = "ul";
-      }
-      html += `<li>${inlineMarkdown(trimmed.replace(/^[-*+]\s+/, ""))}</li>`;
-    } else if (/^\d+[.)]\s+/.test(trimmed)) {
-      if (listType !== "ol") {
-        closeList();
-        html += "<ol>";
-        listType = "ol";
-      }
-      html += `<li>${inlineMarkdown(trimmed.replace(/^\d+[.)]\s+/, ""))}</li>`;
-    } else {
-      closeList();
-      html += `<p>${inlineMarkdown(line)}</p>`;
-    }
-  }
-  closeList();
-  if (inCode) html += "</code></pre>";
-  return html;
-}
-
-function inlineMarkdown(value) {
-  return escapeHtml(value)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>");
-}
-
-function isTableLine(line) {
-  return line.includes("|") && line.split("|").length >= 3;
-}
-
-function escapeHtml(value) {
-  return String(value).replace(
-    /[&<>"']/g,
-    (char) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        char
-      ],
   );
 }
 
@@ -4528,7 +4135,7 @@ function HistoryView({
                         const opened = await onOpen(item.run_id);
                         if (!opened) return;
                         if (!opened.final_report) return;
-                        downloadMarkdown(opened.final_report, `K-Storm 报告 ${opened.run_id}`);
+                        downloadMarkdown(opened.final_report, reportFilename(opened));
                       }}
                     >
                       <Download size={14} />
@@ -4542,7 +4149,7 @@ function HistoryView({
                       onClick={async () => {
                         const opened = await onOpen(item.run_id);
                         if (!opened) return;
-                        onExportPDF(opened.final_report, `K-Storm 报告 ${opened.run_id}`);
+                        onExportPDF(opened.final_report, reportFilename(opened));
                       }}
                     >
                       <Download size={14} />

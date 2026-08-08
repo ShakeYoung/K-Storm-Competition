@@ -49,7 +49,7 @@
   --space-6: 24px;
   --space-8: 32px;
 
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
 
   color: var(--ink);
   background: var(--bg);
@@ -792,14 +792,6 @@ select:focus {
   text-align: center;
 }
 
-/* ── Workflow Flow Chart ── */
-.flow-chart-wrap {
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.flow-chart-wrap::-webkit-scrollbar { height: 4px; }
-.flow-chart-wrap svg text { font-family: var(--font-sans); }
-
 /* ── Debate Stage ── */
 .rounds {
   display: grid;
@@ -999,19 +991,6 @@ select:focus {
   background: var(--panel-strong);
 }
 
-/* ── Group Summary ── */
-.group-summary {
-  background: var(--accent-soft);
-  border: 1px solid rgba(26, 82, 184, 0.15);
-  border-radius: var(--radius-sm);
-  color: var(--accent-strong);
-  line-height: 1.65;
-  margin-top: 16px;
-  padding: 14px;
-}
-
-.group-summary p { margin-top: 6px; }
-
 /* ── Markdown Output ── */
 .markdown-output {
   background: var(--panel-muted);
@@ -1067,10 +1046,6 @@ select:focus {
   justify-content: flex-end;
 }
 
-.history-actions-inlineme .icon-button {
-  white-space: nowrap;
-}
-
 .history-item input {
   min-height: auto;
   width: auto;
@@ -1118,21 +1093,6 @@ select:focus {
   max-width: 220px;
   text-align: right;
   white-space: normal;
-}
-
-/* ── History Filter Bar ── */
-.history-filter {
-  align-items: center;
-  display: flex;
-  gap: 10px;
-}
-
-.history-filter select,
-.history-filter input {
-  min-height: 32px;
-  padding: 4px 8px;
-  width: auto;
-  font-size: 13px;
 }
 
 /* ── Intel Rail ── */
@@ -1222,7 +1182,6 @@ select:focus {
   background: var(--panel-strong);
 }
 
-.mode-option.selected,
 .mode-option.active {
   border-color: var(--accent);
   background: var(--accent-soft);
@@ -1589,11 +1548,11 @@ select:focus {
 .status-badge.completed { background: #EDF2FF; color: var(--agent-novelty); }
 .status-badge.running   { background: var(--accent-soft); color: var(--accent); }
 .status-badge.failed    { background: var(--danger-soft); color: var(--danger); }
+.status-badge.canceled  { background: rgba(245,158,11,0.14); color: #b45309; }
 .status-badge.pending   { background: var(--panel-muted); color: var(--muted); }
 
 /* ── Mode Selector Polish ── */
-.mode-option.active strong,
-.mode-option.selected strong { color: var(--accent); }
+.mode-option.active strong { color: var(--accent); }
 
 /* ── Page transition ── */
 .page {
@@ -2012,7 +1971,7 @@ mark.kw-hl {
   --text-muted: var(--muted);
   --surface: var(--panel-strong);
 
-  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace;
 }
 
@@ -2138,7 +2097,6 @@ body::before {
 .history-item,
 .agent-card,
 .markdown-output,
-.group-summary,
 .settings-modal,
 .settings-sidebar,
 .model-candidate-list,
@@ -2285,6 +2243,7 @@ body::before {
 
 .status-badge.completed { background: var(--success-soft); color: var(--success); }
 .status-badge.failed { background: var(--danger-soft); color: var(--danger); }
+.status-badge.canceled { background: rgba(245,158,11,0.14); color: #b45309; }
 .status-badge.pending { background: var(--panel-muted); color: var(--muted); }
 
 textarea,
@@ -2313,9 +2272,7 @@ select:focus,
 
 .demo-mode-card,
 .mode-option.active,
-.mode-option.selected,
-.provider-row.active,
-.group-summary {
+.provider-row.active {
   background: rgba(36,111,224,0.08);
   border-color: rgba(36,111,224,0.14);
   color: var(--accent-strong);
