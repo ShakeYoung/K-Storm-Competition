@@ -101,7 +101,7 @@ K-Storm 根据模板信息密度自动判断当前所处的科研周期阶段，
 
 ## 🏗️ 系统架构
 
-K-Storm 的核心是一个本地运行的研究编排系统：React 控制台负责输入、讨论可视化与报告呈现，FastAPI 后端维护运行状态机，并按 Agent 位置路由到不同模型。系统共有 9 个专职 Agent，协同完成从输入整合到最终报告的全流程：
+K-Storm 的核心是一个本地运行的研究编排系统：React 控制台负责输入、讨论可视化与报告呈现，FastAPI 后端维护运行状态机，并按 Agent 位置路由到不同模型。系统共有 10 个专职 Agent（4 个讨论 Agent + 6 个编排/综合 Agent），协同完成从输入整合到最终报告的全流程：
 
 **讨论组**（每个 Agent 可独立绑定不同模型）
 - **Novelty Agent**：提出新方向与差异化切入点
@@ -158,26 +158,32 @@ Citation Review Agent → 引用线索审查报告
 ```text
 backend/
   app/
-    agents/              Agent 定义与注册
+    agents/              Agent 定义与注册（10 个专职 Agent）
     model_providers/     Mock / OpenAI-compatible / Anthropic 供应商
-    orchestrator/        运行执行状态机
+    orchestrator/        运行执行状态机（runner.py + prompts.py）
     schemas/             Pydantic 模型
     storage/             SQLite 数据层
     memory/              TF-IDF 跨 Run 记忆检索引擎
     main.py              FastAPI 入口
+    tests/               pytest 测试（34 个，覆盖模式/API/记忆/引用/IR/恢复）
 frontend/
   public/
     favicon.svg          应用图标（浏览器标签页图标）
   src/
-    main.jsx             React 应用
+    main.jsx             React 应用（页面装配与状态管理）
+    components/          页面组件（设置/记忆查询/历史/外部论据等）
+    lib/                 工具库（markdown 渲染 / ZIP / 下载导出）
     styles/
       app.css            样式表 — 浅色中科大蓝主题
+data/
+  ks.sqlite3             本地历史记录数据库（WAL 模式）
 assets/
   k-storm-icon.svg       项目图标（1024×1024，可用于桌面应用打包）
   k-storm-architecture.svg
 docs/
   ARCHITECTURE.zh-CN.md       架构文档
   K-STORM-ROADMAP.zh-CN.md    演进路线图
+  VERSIONING.zh-CN.md         版本管理
 ```
 
 </details>
@@ -211,7 +217,17 @@ npm run dev
 
 打开 <http://localhost:5173>。
 
-### 3. 配置模型（可选）
+### 3. 运行测试
+
+```bash
+cd backend
+python -m pytest tests/ -q        # 34 个后端测试（模式/API/记忆检索/引用提取/IR 解析/恢复路径）
+
+cd ../frontend
+npm run build                     # 前端生产构建验证
+```
+
+### 4. 配置模型（可选）
 
 点击顶栏**模型设置**，支持以下供应商：
 
@@ -221,14 +237,14 @@ npm run dev
 | OpenAI Responses | OpenAI |
 | Anthropic Messages | Claude |
 | Coding Plan | Kimi、百炼、火山引擎 |
-| 科大107平台预置 | GLM5.2 / DeepSeek-V4（一键分配） |
+| 科大107平台预置 | GLM5.2 / DeepSeek-V4（⚡一键配置：读取全部模型 + 推荐分配） |
 
 API Key 仅保存在浏览器 `localStorage` 中，不会写入磁盘或 SQLite。
 
 ### 中国科大 107 平台与参赛说明
 
 - 平台适配：见 [docs/USTC-107-PLATFORM-GUIDE.zh-CN.md](docs/USTC-107-PLATFORM-GUIDE.zh-CN.md)
-- 封装程序版本管理：见 [docs/VERSIONING.zh-CN.md](docs/VERSIONING.zh-CN.md)
+- 版本管理：见 [docs/VERSIONING.zh-CN.md](docs/VERSIONING.zh-CN.md)
 - 参赛演示：在“新建讨论”页使用“参赛演示模式”，可一键加载科研训练、组会预演和结果诊断案例。
 
 <details>

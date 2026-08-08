@@ -1,6 +1,6 @@
 # K-Storm 项目架构图
 
-K-Storm 是一个本地运行的科研选题多 Agent 头脑风暴系统。当前版本为 V1.6，采用轻量 Web 架构：FastAPI 提供后端 API，React + Vite 作为主前端，SQLite 用于本地历史记录。
+K-Storm 是一个本地运行的科研选题多 Agent 头脑风暴系统。当前版本为 v2.1.0（前后端参赛版），采用轻量 Web 架构：FastAPI 提供后端 API，React + Vite 作为主前端，SQLite 用于本地历史记录。桌面封装（Electron/PyInstaller）为后续阶段，当前以「前后端调试 + 参赛演示」为交付边界。
 
 ## 1. 总体架构
 
@@ -435,13 +435,15 @@ K-Storm/
 - Citation Review Agent：对外部引用进行线索一致性、完整性和支撑关系审查（基于讨论文本，不接外部文献数据库）。
 - TF-IDF 跨 Run 记忆检索：从 StructuredIRV2 和 StructuredBrief 中提取候选方向、关键主张、批判点和机会点。
 - 模式升级链路：Quick Probe → Focused Panel → Full Deliberation，并自动携带前序上下文。
-- SSE 实时推送：状态流和 token 流双通道。
+- SSE 实时推送：状态流和 token 流双通道，连接断开自动结束（无固定超时）。
 - 参赛演示模式：内置高质量科研训练案例，一键填入模板。
-- 桌面封装支持：Electron 启动 PyInstaller 后端，用户数据写入应用数据目录。
+- 稳定性收口：启动时回收服务重启遗留的进行中 run（可一键恢复）；resume 按讨论模式路由（聚焦/快速/记忆不退化）；34 个 pytest 测试全绿。
+- USTC 107 平台预置：10 个模型 preset，前端「⚡ 一键配置」读取全部模型并生成推荐分配。
 
 ### 后续优化方向
 
-- 补充端到端冒烟测试和参赛演示脚本。
-- 验证 Windows 正式发行包的 `.ico` 图标显示与 NSIS 安装流程。
+- 桌面封装（Electron + PyInstaller）：为后续阶段，剥离后已从本仓库移除，重新封装时复用 `assets/` 下的图标与 `docs/VERSIONING.zh-CN.md` 的版本规则。
+- 本地文档 chunk 级检索与更细粒度证据绑定（路线图 V2 核心）。
+- 引用真实性在线核验（Crossref / OpenAlex / arXiv，可选开关）。
+- 人工介入讨论（human-in-the-loop）与多 Run 对比视图。
 - 将平台适配截图纳入 `docs/screenshots/`，用于比赛提交材料。
-- 在 V2 阶段继续增强文档 chunk 级检索和更细粒度证据绑定。

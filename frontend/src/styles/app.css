@@ -1461,12 +1461,62 @@ select:focus {
   .intel-rail { display: none; }
 }
 
+/* ── Mobile bottom nav（默认隐藏，≤900px 显示） ──
+   注意：基础规则必须写在 media query 之前，否则 display:none 会覆盖媒体查询的 flex */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--border-strong);
+  box-shadow: 0 -2px 12px rgba(20, 40, 80, 0.08);
+}
+.mobile-bottom-nav .nav-item {
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 48px;
+  padding: 6px 2px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid transparent;
+  color: var(--ink-soft);
+  background: transparent;
+}
+.mobile-bottom-nav .nav-item:hover {
+  background: rgba(36, 111, 224, 0.06);
+  transform: none;
+}
+.mobile-bottom-nav .nav-item.active {
+  color: var(--accent-strong);
+  background: rgba(36, 111, 224, 0.08);
+  border-color: rgba(36, 111, 224, 0.12);
+  padding-left: 2px;
+}
+.mobile-bottom-nav .nav-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 18px);
+}
+
 @media (max-width: 900px) {
   .workspace {
     grid-template-columns: 0 minmax(0, 1fr) 0;
   }
   .left-nav { display: none; }
   .intel-rail { display: none; }
+  /* 移动端底部导航替代隐藏的左导航，主舞台底部留出空间避免遮挡 */
+  .mobile-bottom-nav { display: flex; }
+  .main-stage { padding-bottom: 72px; }
 }
 
 @media (max-width: 720px) {

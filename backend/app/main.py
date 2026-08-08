@@ -308,16 +308,6 @@ async def token_stream(run_id: str, request: Request) -> StreamingResponse:
         },
     )
 
-    return StreamingResponse(
-        _gen(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
 
 @app.get("/api/runs/{run_id}/messages")
 def get_messages(run_id: str):

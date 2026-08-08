@@ -146,26 +146,32 @@ Output Agent → final Markdown report
 ```text
 backend/
   app/
-    agents/              Agent definitions and registry
+    agents/              Agent definitions and registry (10 dedicated agents)
     model_providers/     Mock, OpenAI-compatible, Anthropic providers
-    orchestrator/        Run execution state machine
+    orchestrator/        Run execution state machine (runner.py + prompts.py)
     schemas/             Pydantic models
     storage/             SQLite database layer
     memory/              TF-IDF cross-run memory retrieval engine
     main.py              FastAPI app entry point
+    tests/               pytest suite (34 tests: modes/API/memory/references/IR/resume)
 frontend/
   public/
     favicon.svg          App icon (browser favicon)
   src/
-    main.jsx             React application
+    main.jsx             React application (page assembly & state)
+    components/          Page components (settings, memory query, history, references)
+    lib/                 Utilities (markdown renderer / ZIP / download helpers)
     styles/
       app.css            Stylesheet — light USTC blue theme
+data/
+  ks.sqlite3             Local history database (WAL mode)
 assets/
   k-storm-icon.svg       Project icon (1024×1024, for app packaging)
   k-storm-architecture.svg
 docs/
   ARCHITECTURE.zh-CN.md       Architecture documentation
   K-STORM-ROADMAP.zh-CN.md    Evolution roadmap
+  VERSIONING.zh-CN.md         Versioning guide
 ```
 
 </details>
@@ -199,7 +205,17 @@ npm run dev
 
 Open <http://localhost:5173>.
 
-### 3. Configure Models (optional)
+### 3. Run Tests
+
+```bash
+cd backend
+python -m pytest tests/ -q        # 34 backend tests (modes/API/memory/references/IR/resume)
+
+cd ../frontend
+npm run build                     # verify the production frontend build
+```
+
+### 4. Configure Models (optional)
 
 Open **Model Settings** in the top bar. Supported provider types:
 
@@ -209,7 +225,7 @@ Open **Model Settings** in the top bar. Supported provider types:
 | OpenAI Responses | OpenAI |
 | Anthropic Messages | Claude |
 | Coding Plan | Kimi, 百炼, 火山引擎 |
-| USTC-107 preset | GLM5.2 / DeepSeek-V4 (one-click) |
+| USTC-107 preset | GLM5.2 / DeepSeek-V4 (⚡ one-click setup: load all models + recommended assignment) |
 
 API keys stay in your browser's `localStorage` — never written to disk or SQLite.
 
