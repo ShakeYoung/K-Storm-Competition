@@ -48,8 +48,8 @@ def _verify_one(ref: ExternalReference, enabled: list[str]) -> ReferenceVerifica
     authors = ref.authors or ""
     year = ref.year or ""
 
-    # 显式 arXiv id 优先走 arXiv
-    if "arxiv" in enabled and arxiv.extract_arxiv_id(url) or arxiv.extract_arxiv_id(title):
+    # 显式 arXiv id 优先走 arXiv（注意：必须先检查 enabled，否则 and/or 优先级会绕过 source 过滤）
+    if "arxiv" in enabled and (arxiv.extract_arxiv_id(url) or arxiv.extract_arxiv_id(title)):
         return arxiv.verify(title, url, authors, year)
 
     # 有 DOI 优先走 Crossref

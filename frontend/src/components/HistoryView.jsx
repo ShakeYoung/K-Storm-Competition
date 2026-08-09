@@ -1,7 +1,7 @@
 import React from "react";
-import { Download, History, RefreshCw } from "lucide-react";
-import { ACTIVE_RUN_STATES, statusBadgeClass } from "../lib/constants.js";
-import { downloadMarkdown, reportFilename } from "../lib/download.js";
+import { Download, History, RefreshCw, Upload } from "lucide-react";
+import { ACTIVE_RUN_STATES, API_BASE, statusBadgeClass } from "../lib/constants.js";
+import { downloadJsonFile, downloadMarkdown, reportFilename } from "../lib/download.js";
 
 function HistoryView({
   history,
@@ -18,9 +18,48 @@ function HistoryView({
   onConfirmRerunRun,
   onExportPDF,
   loading,
+  setError: setExternalError,
+  onLoadHistory,
 }) {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [importing, setImporting] = React.useState(false);
+  const fileInputRef = React.useRef(null);
+
+  const setError = (msg) => setExternalError?.(msg);
+
+  async function exportAll() {
+    try {
+      const resp = await fetch(`${API_BASE}/api/history/export`);
+      if (!resp.ok) throw new Error("导出失败");
+      const data = await resp.json();
+      downloadJsonFile(data, `kstorm-history-${new Date().toISOString().slice(0, 10)}.json`);
+      setError(`已导出 ${data.count} 条历史记录。`);
+    } catch (err) {
+      setError(err.message || "导出失败");
+    }
+  }
+
+  async function importAll(file) {
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const resp = await fetch(`${API_BASE}/api/history/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!resp.ok) throw new Error("导入失败");
+      const result = await resp.json();
+      setError(`导入完成：新增 ${result.imported} 条，跳过已存在 ${result.skipped} 条。`);
+      if (result.imported > 0 && onLoadHistory) onLoadHistory();
+    } catch (err) {
+      setError(err.message || "导入失败，请检查 JSON 文件格式");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   function toggle(runId, checked) {
     setSelected((current) =>
@@ -66,6 +105,27 @@ function HistoryView({
         <button className="danger-button" disabled={!selected.length} onClick={onDelete}>
           删除所选
         </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button className="icon-button" disabled={importing || !history.length} onClick={exportAll} style={{ fontSize: 12, minHeight: 32 }}>
+            <Download size={14} />
+            <span>导出全部</span>
+          </button>
+          <button className="icon-button" disabled={importing} onClick={() => fileInputRef.current?.click()} style={{ fontSize: 12, minHeight: 32 }}>
+            <Upload size={14} />
+            <span>{importing ? "导入中…" : "导入历史"}</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) importAll(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
       </div>
       <div className="history-filter-bar">
         <input

@@ -170,7 +170,7 @@ backend/
     storage/             SQLite database layer
     memory/              TF-IDF cross-run memory retrieval engine
     main.py              FastAPI app entry point
-    tests/               pytest suite (34 tests: modes/API/memory/references/IR/resume)
+    tests/               pytest suite (61 backend + 16 frontend tests: modes/API/memory/references/IR/resume/verification/interject)
 frontend/
   public/
     favicon.svg          App icon (browser favicon)
@@ -226,10 +226,11 @@ Open <http://localhost:5173>.
 
 ```bash
 cd backend
-python -m pytest tests/ -q        # 34 backend tests (modes/API/memory/references/IR/resume)
+python -m pytest tests/ -q        # 61 backend tests (modes/API/memory/references/IR/resume/verification/interject)
 
 cd ../frontend
 npm run build                     # verify the production frontend build
+npm test                          # 16 frontend pure-function tests (markdown/zip)
 ```
 
 ### 4. Configure Models (optional)

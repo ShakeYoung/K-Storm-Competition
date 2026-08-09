@@ -803,6 +803,8 @@ function App() {
               onConfirmRerunRun={confirmRerunAndEdit}
               onExportPDF={(content, title) => exportPDF(content, title)}
               loading={loading}
+              setError={setError}
+              onLoadHistory={loadHistory}
             />
             </div>
           </div>

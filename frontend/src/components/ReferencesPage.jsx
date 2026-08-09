@@ -64,8 +64,9 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
   async function verifyRefs() {
     if (!run?.run_id) return;
     setVerifying(true);
-    setError("");
+    setError("开始在线核验，逐条请求 arXiv/Crossref/OpenReview…");
     try {
+      // POST 启动异步任务（后台串行，每条完成即写回 DB）
       const resp = await fetch(`${API_BASE}/api/runs/${run.run_id}/references/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -73,16 +74,35 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
       });
       if (!resp.ok) {
         const detail = await readError(resp);
-        throw new Error(detail || "核验失败");
+        throw new Error(detail || "启动核验失败");
       }
-      const data = await resp.json();
-      setRun(data);
-      const verified = (data.external_references || []).filter((r) => r.verification?.status === "verified").length;
-      const pending = (data.external_references || []).filter((r) => ["pending", "not_found", "mismatch"].includes(r.verification?.status)).length;
-      setError(`在线核验完成：${verified} 条已核验存在，${pending} 条需人工核实或未找到。`);
+
+      // 轮询进度，每 1.2s 拉一次最新快照（SSE 不适用——核验是后台任务，不走 run 状态流）
+      const poll = async () => {
+        try {
+          const prog = await fetch(`${API_BASE}/api/runs/${run.run_id}/references/verify`).then((r) => r.json());
+          const done = prog.done || 0;
+          const total = prog.total || 0;
+          // 每次拉最新 run 快照，让徽章实时刷新
+          const latest = await fetch(`${API_BASE}/api/runs/${run.run_id}`).then((r) => r.json());
+          setRun(latest);
+          if (prog.status === "running") {
+            setError(`核验中… ${done}/${total} 条完成`);
+            setTimeout(poll, 1200);
+          } else {
+            const verified = (latest.external_references || []).filter((r) => r.verification?.status === "verified").length;
+            const pending = (latest.external_references || []).filter((r) => ["pending", "not_found", "mismatch"].includes(r.verification?.status)).length;
+            setError(`在线核验完成：${verified} 条已核验存在，${pending} 条需人工核实或未找到。`);
+            setVerifying(false);
+          }
+        } catch {
+          setError("核验进度轮询失败，可稍后刷新查看结果。");
+          setVerifying(false);
+        }
+      };
+      setTimeout(poll, 1200);
     } catch (err) {
       setError(err.message);
-    } finally {
       setVerifying(false);
     }
   }
@@ -128,9 +148,9 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
   }, [refs]);
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "280px minmax(0, 1fr)", gap: 16, minHeight: "100%" }}>
+    <div className="refs-layout">
       {/* 左侧：历史记录列表 */}
-      <div className="panel" style={{ display: "flex", flexDirection: "column", overflow: "auto", maxHeight: "calc(100vh - 120px)", padding: 0 }}>
+      <div className="panel refs-sidebar">
         <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ink-soft)" }}>历史讨论</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>{allRuns.length} 条记录</div>
@@ -181,7 +201,7 @@ function ReferencesPage({ run, setRun, setError, onNavigate, history, openRun })
       </div>
 
       {/* 右侧：论据内容 */}
-      <div className="panel" style={{ display: "grid", gap: 16, alignContent: "start" }}>
+      <div className="panel refs-content">
         <div className="pane-heading">
           <div>
             <h2>外部论据清单</h2>

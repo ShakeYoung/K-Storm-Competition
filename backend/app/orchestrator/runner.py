@@ -1509,7 +1509,14 @@ def run_citation_review_step(
     messages: list[DebateMessage],
     timeline: list[TimelineStep],
 ) -> tuple[str, list[TimelineStep], RunRecord]:
-    """引用审查阶段：对讨论中所有 Agent 引用的文献进行语义交叉验证。"""
+    """引用审查阶段：对讨论中所有 Agent 引用的文献进行语义交叉验证。
+    若 run 已有在线核验结果（用户事先核验过），注入到 prompt 供 Agent 参考。
+    """
+    # 收集已有的核验结果（核验是用户事后触发的，首次运行通常为空）
+    existing_verifications = [
+        r.verification for r in (run.external_references or [])
+        if r.verification and r.verification.get("status") not in (None, "skipped")
+    ] or None
     timeline = start_timeline_step(timeline, "citation_review")
     run = update_run_checked(
         run.run_id,
@@ -1528,7 +1535,7 @@ def run_citation_review_step(
             provider,
             agent_key=CITATION_REVIEW_AGENT.key,
             system_prompt=CITATION_REVIEW_AGENT.system_prompt,
-            user_prompt=citation_review_prompt(run.template_input, messages),
+            user_prompt=citation_review_prompt(run.template_input, messages, verifications=existing_verifications),
             max_tokens=OUTPUT_LIMITS["citation_review"],
             on_retry=retry_callback(run.run_id, "citation_review", "Citation Review Agent 引用审查"),
             kind="citation_review",

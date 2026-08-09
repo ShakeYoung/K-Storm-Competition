@@ -127,28 +127,56 @@ def test_unknown_run_returns_404(client):
 
 
 def test_verify_references_endpoint_writes_verification(client, monkeypatch):
-    """verify 端点把核验结果写回 external_references.verification 字段。"""
+    """异步核验：POST 启动后台任务，GET 轮询进度，完成后 verification 写回 DB。"""
     from app.schemas.models import ExternalReference
     from app.verification.schemas import ReferenceVerification
 
     run_id = _create_run(client)
-    # 直接给 run 灌一条带 arXiv URL 的引用
     from app.storage import db
     db.update_run(run_id, external_references=[
         ExternalReference(id="REF-1", source_type="paper", title="Test Paper",
                           url="https://arxiv.org/abs/1706.03762", authors="Vaswani"),
     ])
 
-    # mock 核验器避免真实网络（端点侧集成，核验逻辑由 test_verification 覆盖）
+    # mock 核验器避免真实网络
     def fake_verify(refs, sources=None):
         return [ReferenceVerification(status="verified", source="arxiv", matched_title="Test Paper")]
     monkeypatch.setattr("app.verification.verify.verify_references", fake_verify)
 
+    # POST 启动异步任务
     response = client.post(f"/api/runs/{run_id}/references/verify", json={})
-    assert response.status_code == 200, response.text
-    refs = response.json()["external_references"]
-    assert refs[0]["verification"]["status"] == "verified"
-    assert refs[0]["verification"]["source"] == "arxiv"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] in ("running", "completed")
+    assert body["total"] >= 1
+
+    # TestClient 在响应返回前会同步执行 BackgroundTasks，故此时已写回 DB
+    run = db.get_run(run_id)
+    assert run.external_references[0].verification["status"] == "verified"
+    assert run.external_references[0].verification["source"] == "arxiv"
+
+    # GET 轮询返回完成状态
+    progress = client.get(f"/api/runs/{run_id}/references/verify").json()
+    assert progress["status"] == "completed"
+    assert progress.get("verified", 0) >= 1
+
+
+def test_verify_references_skips_cached(client, monkeypatch):
+    """已核验的引用应跳过（缓存），不重复核验。"""
+    from app.schemas.models import ExternalReference
+
+    run_id = _create_run(client)
+    from app.storage import db
+    db.update_run(run_id, external_references=[
+        ExternalReference(id="REF-1", source_type="paper", title="Cached",
+                          url="https://arxiv.org/abs/1706.03762",
+                          verification={"status": "verified", "source": "arxiv"}),
+    ])
+    # 不应调用真实核验（若调用会因 mock 缺失报错）
+    response = client.post(f"/api/runs/{run_id}/references/verify", json={})
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert response.json().get("cached", 0) >= 1
 
 
 def test_verify_references_empty_returns_400(client):

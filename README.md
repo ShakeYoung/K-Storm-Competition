@@ -182,7 +182,7 @@ backend/
     storage/             SQLite 数据层
     memory/              TF-IDF 跨 Run 记忆检索引擎
     main.py              FastAPI 入口
-    tests/               pytest 测试（34 个，覆盖模式/API/记忆/引用/IR/恢复）
+    tests/               pytest 测试（61 个后端 + 16 个前端，覆盖模式/API/记忆/引用/IR/恢复/核验/介入）
 frontend/
   public/
     favicon.svg          应用图标（浏览器标签页图标）
@@ -238,10 +238,11 @@ npm run dev
 
 ```bash
 cd backend
-python -m pytest tests/ -q        # 34 个后端测试（模式/API/记忆检索/引用提取/IR 解析/恢复路径）
+python -m pytest tests/ -q        # 61 个后端测试（模式/API/记忆检索/引用提取/IR 解析/恢复/核验/介入）
 
 cd ../frontend
 npm run build                     # 前端生产构建验证
+npm test                          # 16 个前端纯函数测试（markdown/zip）
 ```
 
 ### 4. 配置模型（可选）

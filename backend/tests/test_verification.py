@@ -62,6 +62,35 @@ def test_crossref_routed_when_doi_present():
     assert result.source == "crossref"
 
 
+def test_source_filter_respects_enabled_list():
+    """回归：sources 未启用 arxiv 时，即使 title 含 arXiv id 也不应走 arxiv。
+    这是 and/or 优先级 bug 的回归保护（原 bug：A and B or C 绕过了 enabled 检查）。
+    """
+    ref = ExternalReference(
+        id="r1", source_type="paper",
+        title="Attention Is All You Need arXiv:1706.03762",
+        url="https://arxiv.org/abs/1706.03762",
+    )
+    arxiv_called = {"yes": False}
+
+    def _track_arxiv(*args, **kwargs):
+        arxiv_called["yes"] = True
+        return ReferenceVerification(status="verified", source="arxiv")
+
+    with patch.object(arxiv, "verify", side_effect=_track_arxiv), \
+         patch.object(crossref, "verify", return_value=ReferenceVerification(status="skipped", source="crossref")):
+        # 只启用 crossref：不应调用 arxiv.verify
+        result = _verify_one(ref, ["crossref"])
+    assert arxiv_called["yes"] is False, "sources 未含 arxiv 时不应调用 arxiv.verify"
+    assert result.source != "arxiv"
+
+    # 反向：启用 arxiv 时应调用
+    arxiv_called["yes"] = False
+    with patch.object(arxiv, "verify", side_effect=_track_arxiv):
+        _verify_one(ref, ["arxiv"])
+    assert arxiv_called["yes"] is True, "sources 含 arxiv 且有 id 时应调用 arxiv.verify"
+
+
 # ── 离线降级 ─────────────────────────────────────────────────────────────────
 
 def test_arxiv_network_failure_degrades_to_pending():

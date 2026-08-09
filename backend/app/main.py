@@ -467,27 +467,85 @@ def regenerate_references(run_id: str, payload: dict | None = Body(default=None)
 
 
 @app.post("/api/runs/{run_id}/references/verify")
-def verify_references_endpoint(run_id: str, payload: dict | None = Body(default=None)) -> RunRecord:
-    """对 run 的外部引用执行在线核验（arXiv/Crossref/OpenReview），结果写回 verification 字段。"""
+def verify_references_endpoint(run_id: str, background_tasks: BackgroundTasks, payload: dict | None = Body(default=None)) -> dict:
+    """异步核验：启动后台任务，立即返回进度句柄。前端轮询同端点（GET）查进度。
+    已核验的引用会缓存（verification 字段非空且非 pending/skipped 时跳过）。
+    """
     try:
         source = db.get_run(run_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Run not found") from exc
-    from app.verification.verify import verify_references
     refs = list(source.external_references or [])
     if not refs:
         raise HTTPException(status_code=400, detail="该 Run 暂无外部引用，请先提取引用")
     sources_filter = (payload or {}).get("sources")
     sources_list = sources_filter.split(",") if isinstance(sources_filter, str) else None
+
+    # 已有进行中任务则返回当前进度，避免重复启动
+    state = _get_verify_state(run_id)
+    if state.get("status") == "running":
+        return {"run_id": run_id, **state}
+
+    # 筛选需要核验的引用（跳过已 verified/mismatch/not_found 的缓存）
+    need_verify = [r for r in refs if not r.verification or r.verification.get("status") in (None, "pending", "skipped")]
+    if not need_verify:
+        cached = sum(1 for r in refs if r.verification and r.verification.get("status") not in (None, "pending", "skipped"))
+        return {"run_id": run_id, "status": "completed", "total": len(refs), "done": len(refs), "cached": cached, "detail": "所有引用均已核验"}
+
+    _set_verify_state(run_id, {"status": "running", "total": len(refs), "done": len(refs) - len(need_verify), "cached": len(refs) - len(need_verify)})
+    background_tasks.add_task(_run_verification_task, run_id, sources_list)
+    return {"run_id": run_id, "status": "running", "total": len(refs), "done": len(refs) - len(need_verify), "cached": len(refs) - len(need_verify)}
+
+
+@app.get("/api/runs/{run_id}/references/verify")
+def get_verify_progress(run_id: str) -> dict:
+    """轮询核验进度。任务完成后返回最新 external_references 快照。"""
+    state = _get_verify_state(run_id)
+    if state.get("status") != "running":
+        # 已完成或无任务：返回当前引用的核验摘要
+        try:
+            run = db.get_run(run_id)
+            refs = run.external_references or []
+            verified = sum(1 for r in refs if r.verification and r.verification.get("status") == "verified")
+            pending = sum(1 for r in refs if not r.verification or r.verification.get("status") in (None, "pending", "skipped"))
+            return {"run_id": run_id, "status": state.get("status", "idle"), "total": len(refs), "done": len(refs), "verified": verified, "pending": pending}
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Run not found")
+    return {"run_id": run_id, **state}
+
+
+# ── 核验任务状态（进程内，仿 streaming buffer 范式）──────────────────────────
+_VERIFY_STATES: dict[str, dict] = {}
+
+
+def _get_verify_state(run_id: str) -> dict:
+    return dict(_VERIFY_STATES.get(run_id, {"status": "idle"}))
+
+
+def _set_verify_state(run_id: str, state: dict) -> None:
+    _VERIFY_STATES[run_id] = state
+
+
+def _run_verification_task(run_id: str, sources_list: list[str] | None) -> None:
+    """后台串行核验任务，每条完成后立即写回 DB + 更新进度。"""
+    from app.verification.verify import verify_references
     try:
-        verifications = verify_references(refs, sources=sources_list)
+        run = db.get_run(run_id)
+        refs = list(run.external_references or [])
+        # 只核验未缓存的
+        indices_to_verify = [i for i, r in enumerate(refs) if not r.verification or r.verification.get("status") in (None, "pending", "skipped")]
+        done = len(refs) - len(indices_to_verify)
+        for idx in indices_to_verify:
+            verifications = verify_references([refs[idx]], sources=sources_list)
+            if verifications:
+                refs[idx].verification = verifications[0].model_dump()
+            done += 1
+            _set_verify_state(run_id, {"status": "running", "total": len(refs), "done": done})
+            db.update_run(run_id, external_references=refs)
+        _set_verify_state(run_id, {"status": "completed", "total": len(refs), "done": done})
     except Exception as exc:
-        logger.exception("reference verification failed for run %s: %s", run_id, exc)
-        raise HTTPException(status_code=502, detail=f"核验失败：{exc}") from exc
-    # 把核验结果回写到对应 ref 的 verification 字段
-    for ref, ver in zip(refs, verifications):
-        ref.verification = ver.model_dump()
-    return db.update_run(run_id, external_references=refs)
+        logger.exception("background verification failed for run %s: %s", run_id, exc)
+        _set_verify_state(run_id, {"status": "failed", "detail": str(exc)})
 
 
 @app.post("/api/documents/extract")

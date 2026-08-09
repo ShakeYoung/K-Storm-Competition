@@ -1657,6 +1657,35 @@ select:focus {
   align-items: center;
   margin-bottom: 14px;
 }
+
+/* ── 外部论据页双栏布局（移动端单列） ── */
+.refs-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 100%;
+}
+.refs-sidebar {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  max-height: calc(100vh - 120px);
+  padding: 0;
+}
+.refs-content {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+@media (max-width: 900px) {
+  /* 移动端：左栏折叠到顶部，内容区占满 */
+  .refs-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .refs-sidebar {
+    max-height: 240px;
+  }
+}
 .history-filter-bar input,
 .history-filter-bar select {
   min-height: 36px;

@@ -33,7 +33,7 @@ K-Storm 以根目录 `package.json` 的 `version` 字段作为唯一版本来源
 3. 同步检查 README、架构文档和平台适配说明是否仍与功能一致。
 4. 执行验证：
    ```bash
-   cd backend && python -m pytest tests/ -q     # 34 个测试全绿
+   cd backend && python -m pytest tests/ -q     # 60+ 个后端测试全绿
    cd ../frontend && npm run build              # 前端生产构建
    ```
 5. 手动冒烟检查：
